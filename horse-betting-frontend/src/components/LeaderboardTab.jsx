@@ -15,36 +15,34 @@ const LeaderboardTab = ({ users, showMessage }) => {
     return user ? user.name : `User ${userId}`;
   };
 
-  // Fetch leaderboard data
-  const fetchLeaderboardData = async () => {
-    setLoading(true);
-    try {
-      const response = await fetch(`${API_BASE}/race-days/leaderboard`);
-      const data = await response.json();
-      if (data && data.success) {
-        const list = Array.isArray(data.leaderboard) ? data.leaderboard : [];
-        // Ensure each entry has totalScore field
-        const normalizedList = list.map(entry => ({
-          ...entry,
-          totalScore: entry.score || 0,
-          userName: entry.name || getUserName(entry.userId)
-        }));
-        setLeaderboardData(normalizedList);
-      } else {
-        setLeaderboardData([]);
-        if (data && data.error) showMessage(data.error, 'error');
-      }
-    } catch (error) {
-      showMessage(`Error fetching leaderboard data: ${error.message}`, 'error');
-      console.error('Error fetching leaderboard data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
+    const fetchLeaderboardData = async () => {
+      setLoading(true);
+      try {
+        const response = await fetch(`${API_BASE}/race-days/leaderboard`);
+        const data = await response.json();
+        if (data && data.success) {
+          const list = Array.isArray(data.leaderboard) ? data.leaderboard : [];
+          const normalizedList = list.map(entry => ({
+            ...entry,
+            totalScore: entry.score || 0,
+            userName: entry.name || users.find(u => u.id === entry.userId)?.name || `User ${entry.userId}`
+          }));
+          setLeaderboardData(normalizedList);
+        } else {
+          setLeaderboardData([]);
+          if (data && data.error) showMessage(data.error, 'error');
+        }
+      } catch (error) {
+        showMessage(`Error fetching leaderboard data: ${error.message}`, 'error');
+        console.error('Error fetching leaderboard data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
     fetchLeaderboardData();
-  }, [users, fetchLeaderboardData]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [users, showMessage]);
 
   // Skeleton component for loading state
   const SkeletonLeaderboard = () => (
