@@ -44,7 +44,7 @@ const LeaderboardTab = ({ users, showMessage }) => {
 
   useEffect(() => {
     fetchLeaderboardData();
-  }, [users]);
+  }, [users, fetchLeaderboardData]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Skeleton component for loading state
   const SkeletonLeaderboard = () => (

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, RefreshCw, ChevronDown, Trophy, Edit3, Check, X, Users } from 'lucide-react';
+import { Calendar, RefreshCw, ChevronDown, Trophy, Edit3, X, Users } from 'lucide-react';
 
 const SkeletonCard = () => (
   <div className="bg-white p-4 rounded-lg shadow animate-pulse">

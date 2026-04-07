@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Trophy, Calendar, Settings, Star, Activity, Home, Menu, X } from 'lucide-react';
+import { Trophy, Settings, Star, Activity, Home, Menu, X } from 'lucide-react';
 
 import HomePage from './components/HomePage.jsx';
 import RaceDayTab from './components/RaceDayTab.jsx';
@@ -312,7 +312,7 @@ const HorseBettingApp = () => {
     } catch (error) {
       showMessage(`Error setting banker: ${error.message}`, 'error');
     }
-  }, [selectedUserId, bets, setBets, setBankers, showMessage]);
+  }, [selectedUserId, bets, setBets, setBankers, showMessage, selectedRaceDay]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     fetchAllData();

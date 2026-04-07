@@ -1,5 +1,5 @@
 import React from 'react';
-import { Trophy, Star, Shield, Users, Info, Award, Target, Heart } from 'lucide-react';
+import { Trophy, Shield, Users, Info, Award, Target, Heart } from 'lucide-react';
 import LeaderboardTab from './LeaderboardTab.jsx';
 
 const HomePage = ({ users, showMessage }) => {

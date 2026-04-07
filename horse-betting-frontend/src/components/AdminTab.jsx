@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Settings, Users, Plus, Calendar, Database, FileText, Folder, Edit2, Trash2, Check, X, LogOut } from 'lucide-react';
+import { Settings, Users, Plus, Calendar, Database, Edit2, Trash2, Check, X, LogOut } from 'lucide-react';
 
 const API_BASE = process.env.NODE_ENV === 'development'
   ? 'http://localhost:5000/api'
