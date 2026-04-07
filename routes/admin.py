@@ -1,8 +1,18 @@
 # routes/admin.py (Updated - Using DataService)
+import os
 from flask import Blueprint, jsonify, request
 from services import data_service
 
 admin_bp = Blueprint('admin', __name__)
+
+@admin_bp.route('/login', methods=['POST'])
+def admin_login():
+    """Validates admin password against ADMIN_PASSWORD env var."""
+    password = request.json.get('password', '')
+    expected = os.getenv('ADMIN_PASSWORD', 'admin123')
+    if password == expected:
+        return jsonify({"success": True}), 200
+    return jsonify({"success": False, "error": "Invalid password"}), 401
 
 @admin_bp.route('/users', methods=['PUT'])
 def update_user():

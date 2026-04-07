@@ -205,15 +205,23 @@ const HorseBettingApp = () => {
       showMessage('Please enter admin password.', 'info');
       return;
     }
-    
-    // Simple password check - in production, this should be more secure
-    if (adminPassword === 'admin123') {
-      setIsAdminAuthenticated(true);
-      setShowAdminLogin(false);
-      setAdminPassword('');
-      showMessage('Admin access granted!', 'success');
-    } else {
-      showMessage('Invalid admin password.', 'error');
+    try {
+      const response = await fetch(`${API_BASE}/admin/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: adminPassword })
+      });
+      const data = await response.json();
+      if (data.success) {
+        setIsAdminAuthenticated(true);
+        setShowAdminLogin(false);
+        setAdminPassword('');
+        showMessage('Admin access granted!', 'success');
+      } else {
+        showMessage('Invalid admin password.', 'error');
+      }
+    } catch (error) {
+      showMessage('Error contacting server.', 'error');
     }
   }, [adminPassword, showMessage]);
 
