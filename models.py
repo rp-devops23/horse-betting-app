@@ -10,6 +10,7 @@ class User(db.Model):
     __tablename__ = 'users'
     id = db.Column(db.String, primary_key=True)
     name = db.Column(db.String, nullable=False)
+    pin = db.Column(db.String(4), nullable=True)
 
     # Relationships
     bets = db.relationship('Bet', backref='user', lazy=True, cascade='all, delete-orphan')

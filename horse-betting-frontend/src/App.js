@@ -27,6 +27,12 @@ const HorseBettingApp = () => {
   const [selectedUserId, setSelectedUserId] = useState(null); // Start with no user selected
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
+  // User PIN login state
+  const [showPinModal, setShowPinModal] = useState(false);
+  const [pendingUserId, setPendingUserId] = useState(null);
+  const [pinInput, setPinInput] = useState('');
+  const [newUserPin, setNewUserPin] = useState('');
+
   // Admin tab state
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
   const [adminPassword, setAdminPassword] = useState('');
@@ -132,12 +138,13 @@ const HorseBettingApp = () => {
       const response = await fetch(`${API_BASE}/users`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newUserName })
+        body: JSON.stringify({ name: newUserName, pin: newUserPin })
       });
       const data = await response.json();
-      if (data.success) {
-        setUsers(prevUsers => [...prevUsers, data.user]);
+      if (response.ok) {
+        setUsers(prevUsers => [...prevUsers, data]);
         setNewUserName('');
+        setNewUserPin('');
         showMessage('User added successfully!', 'success');
       } else {
         showMessage(data.error, 'error');
@@ -145,7 +152,7 @@ const HorseBettingApp = () => {
     } catch (error) {
       showMessage(`Error adding user: ${error.message}`, 'error');
     }
-  }, [newUserName, setUsers, setNewUserName, showMessage]);
+  }, [newUserName, newUserPin, setUsers, setNewUserName, showMessage]);
 
   const handleUpdateUser = useCallback(async (userId, newName) => {
     if (!newName.trim()) {
@@ -326,12 +333,41 @@ const HorseBettingApp = () => {
     fetchAllData();
   }, [fetchAllData]);
 
-  // Auto-select first user when users are loaded
-  useEffect(() => {
-    if (users.length > 0 && !selectedUserId) {
-      setSelectedUserId(users[0].id);
+  const handleUserSelect = useCallback((userId) => {
+    setPendingUserId(userId);
+    setPinInput('');
+    setShowPinModal(true);
+  }, []);
+
+  const handlePinSubmit = useCallback(async () => {
+    if (pinInput.length !== 4) {
+      showMessage('Please enter your 4-digit PIN.', 'info');
+      return;
     }
-  }, [users, selectedUserId]);
+    try {
+      const response = await fetch(`${API_BASE}/users/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: pendingUserId, pin: pinInput })
+      });
+      const data = await response.json();
+      if (data.success) {
+        setSelectedUserId(pendingUserId);
+        setShowPinModal(false);
+        setPinInput('');
+        setPendingUserId(null);
+      } else {
+        showMessage('Wrong PIN. Try again.', 'error');
+        setPinInput('');
+      }
+    } catch (error) {
+      showMessage(`Error: ${error.message}`, 'error');
+    }
+  }, [pendingUserId, pinInput, showMessage]);
+
+  const handleUserLogout = useCallback(() => {
+    setSelectedUserId(null);
+  }, []);
 
   const MessageBox = ({ text, type }) => {
     const bgColor = type === 'error' ? 'bg-red-500' : type === 'success' ? 'bg-green-500' : 'bg-blue-500';
@@ -345,7 +381,34 @@ const HorseBettingApp = () => {
   return (
     <div className="min-h-screen bg-gray-100 font-sans antialiased text-gray-800">
       <div className="container mx-auto p-4 sm:p-8">
-        <h1 className="text-4xl font-extrabold text-center text-indigo-800 mb-8 tracking-tight">Payen family's Lekours</h1>
+        <h1 className="text-4xl font-extrabold text-center text-indigo-800 mb-4 tracking-tight">Payen family's Lekours</h1>
+
+        {/* User selector bar */}
+        <div className="flex items-center justify-center gap-3 mb-6">
+          {selectedUserId ? (
+            <>
+              <span className="text-gray-600 text-sm">Playing as</span>
+              <span className="font-bold text-indigo-700">{users.find(u => u.id === selectedUserId)?.name}</span>
+              <button onClick={handleUserLogout} className="text-xs text-gray-400 hover:text-red-500 underline transition-colors">Switch</button>
+            </>
+          ) : (
+            <div className="text-center">
+              <p className="text-gray-500 text-sm mb-3">Who are you?</p>
+              <div className="flex flex-wrap justify-center gap-2">
+                {users.map(user => (
+                  <button
+                    key={user.id}
+                    onClick={() => handleUserSelect(user.id)}
+                    className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium text-sm"
+                  >
+                    {user.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
         <div className="flex flex-col lg:flex-row gap-8">
           <div className="flex-1">
             {/* Mobile Navigation */}
@@ -474,6 +537,8 @@ const HorseBettingApp = () => {
               <AdminTab
                 newUserName={newUserName}
                 setNewUserName={setNewUserName}
+                newUserPin={newUserPin}
+                setNewUserPin={setNewUserPin}
                 handleAddUser={handleAddUser}
                 handleUpdateUser={handleUpdateUser}
                 handleDeleteUser={handleDeleteUser}
@@ -499,6 +564,37 @@ const HorseBettingApp = () => {
                 showMessage={showMessage}
                 fetchAllData={fetchAllData}
               />
+            )}
+
+            {/* User PIN Modal */}
+            {showPinModal && (
+              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                <div className="bg-white p-6 rounded-lg shadow-xl max-w-sm w-full mx-4">
+                  <h3 className="text-xl font-bold mb-1 text-indigo-700">
+                    {users.find(u => u.id === pendingUserId)?.name}
+                  </h3>
+                  <p className="text-sm text-gray-500 mb-4">Enter your 4-digit PIN</p>
+                  <input
+                    type="password"
+                    inputMode="numeric"
+                    maxLength={4}
+                    value={pinInput}
+                    onChange={(e) => setPinInput(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                    onKeyPress={(e) => e.key === 'Enter' && handlePinSubmit()}
+                    className="w-full p-3 border border-gray-300 rounded-md text-center text-2xl tracking-widest focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    placeholder="••••"
+                    autoFocus
+                  />
+                  <div className="flex gap-3 mt-4">
+                    <button onClick={handlePinSubmit} className="flex-1 bg-indigo-600 text-white py-2 px-4 rounded-md hover:bg-indigo-700 transition-colors">
+                      Login
+                    </button>
+                    <button onClick={() => { setShowPinModal(false); setPinInput(''); }} className="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-400 transition-colors">
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </div>
             )}
 
             {/* Admin Login Modal */}

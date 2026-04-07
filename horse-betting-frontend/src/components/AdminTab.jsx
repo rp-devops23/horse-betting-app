@@ -5,7 +5,7 @@ const API_BASE = process.env.NODE_ENV === 'development'
   ? 'http://localhost:5000/api'
   : "https://horse-betting-backend.onrender.com/api";
 
-const AdminTab = ({ newUserName, setNewUserName, handleAddUser, handleUpdateUser, handleDeleteUser, users, clearAllUserData, handleAdminLogout,
+const AdminTab = ({ newUserName, setNewUserName, newUserPin, setNewUserPin, handleAddUser, handleUpdateUser, handleDeleteUser, users, clearAllUserData, handleAdminLogout,
   backendFiles, setBackendFiles, selectedFile, setSelectedFile,
   editingContent, setEditingContent, isEditing, setIsEditing, loadingFiles, setLoadingFiles,
   loadingFile, setLoadingFile, savingFile, setSavingFile, showMessage, fetchAllData }) => {
@@ -147,13 +147,22 @@ const AdminTab = ({ newUserName, setNewUserName, handleAddUser, handleUpdateUser
         </h3>
         
         {/* Add New User */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2">
           <input
             type="text"
             className="flex-1 p-2 border rounded-md"
-            placeholder="New User Name"
+            placeholder="Name"
             value={newUserName}
             onChange={(e) => setNewUserName(e.target.value)}
+          />
+          <input
+            type="password"
+            inputMode="numeric"
+            maxLength={4}
+            className="w-20 p-2 border rounded-md text-center tracking-widest"
+            placeholder="PIN"
+            value={newUserPin}
+            onChange={(e) => setNewUserPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
           />
           <button onClick={handleAddUser} className="bg-green-500 text-white p-2 rounded-md hover:bg-green-600 transition-colors">
             <Plus className="w-5 h-5" />

@@ -39,13 +39,20 @@ class DataService:
         users = User.query.all()
         return [{"id": user.id, "name": user.name} for user in users]
 
-    def add_user(self, name: str) -> Dict[str, Any]:
+    def add_user(self, name: str, pin: str = None) -> Dict[str, Any]:
         """Add a new user to the database."""
         user_id = str(uuid.uuid4())
-        new_user = User(id=user_id, name=name)
+        new_user = User(id=user_id, name=name, pin=pin)
         db.session.add(new_user)
         db.session.commit()
         return {"id": user_id, "name": name}
+
+    def verify_user_pin(self, user_id: str, pin: str) -> bool:
+        """Verify a user's PIN."""
+        user = User.query.get(user_id)
+        if user and user.pin:
+            return user.pin == pin
+        return False
 
     def delete_user(self, user_id: str) -> bool:
         """Deletes a user and all their associated data."""
