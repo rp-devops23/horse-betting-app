@@ -12,28 +12,28 @@ services:
       - key: FLASK_DEBUG
         value: false
 
-  # Thursday 18:00 MUT (UTC+4) = 14:00 UTC — check for Saturday races
+  # Thu+Fri 18:00 MUT (UTC+4) = 14:00 UTC — evening check (cards published Thu/Fri)
   - type: cron
-    name: scrape-saturday-races
+    name: scrape-races-evening
     env: python
     runtime: python
     pythonVersion: "3.11.0"
     buildCommand: pip install -r requirements.txt
     startCommand: python scripts/scrape_weekend_races.py
-    schedule: "0 14 * * 4"
+    schedule: "0 14 * * 4,5"
     envVars:
       - key: FLASK_ENV
         value: production
 
-  # Friday 18:00 MUT (UTC+4) = 14:00 UTC — check for Sunday races
+  # Sat+Sun 08:00 MUT (UTC+4) = 04:00 UTC — morning fallback check
   - type: cron
-    name: scrape-sunday-races
+    name: scrape-races-morning
     env: python
     runtime: python
     pythonVersion: "3.11.0"
     buildCommand: pip install -r requirements.txt
     startCommand: python scripts/scrape_weekend_races.py
-    schedule: "0 14 * * 5"
+    schedule: "0 4 * * 6,0"
     envVars:
       - key: FLASK_ENV
         value: production
