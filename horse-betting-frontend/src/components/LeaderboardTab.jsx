@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Trophy, Users } from 'lucide-react';
 
-const API_BASE = process.env.NODE_ENV === 'development'
-  ? 'http://localhost:5000/api'
-  : "https://horse-betting-backend.onrender.com/api";
+import API_BASE from '../config';
 
 const LeaderboardTab = ({ users, showMessage }) => {
   const [leaderboardData, setLeaderboardData] = useState([]);

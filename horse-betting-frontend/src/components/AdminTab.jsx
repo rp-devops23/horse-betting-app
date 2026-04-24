@@ -1,9 +1,7 @@
 import React, { useState } from 'react';
 import { Settings, Users, Plus, Calendar, Database, Edit2, Trash2, Check, X, LogOut } from 'lucide-react';
 
-const API_BASE = process.env.NODE_ENV === 'development'
-  ? 'http://localhost:5000/api'
-  : "https://horse-betting-backend.onrender.com/api";
+import API_BASE from '../config';
 
 const AdminTab = ({ newUserName, setNewUserName, newUserPin, setNewUserPin, handleAddUser, handleUpdateUser, handleDeleteUser, users, clearAllUserData, handleAdminLogout,
   backendFiles, setBackendFiles, selectedFile, setSelectedFile,

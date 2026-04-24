@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, RefreshCw, ChevronDown, Trophy, Edit3, X, Users } from 'lucide-react';
+import API_BASE from '../config';
 
 const SkeletonCard = () => (
   <div className="bg-white p-4 rounded-lg shadow animate-pulse">
@@ -15,7 +16,7 @@ const RaceDayTab = ({ races, currentRaceDay, availableRaceDays, selectedRaceDay,
 
   const handleSetWinner = async (raceId, winnerHorseNumber) => {
     try {
-      const response = await fetch(`${process.env.NODE_ENV === 'development' ? 'http://localhost:5000/api' : "https://horse-betting-backend.onrender.com/api"}/races/${raceId}/winner`, {
+      const response = await fetch(`${API_BASE}/races/${raceId}/winner`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ winnerHorseNumber })
@@ -43,7 +44,7 @@ const RaceDayTab = ({ races, currentRaceDay, availableRaceDays, selectedRaceDay,
     console.log('fetchRaceDayScores called with:', raceDate);
     setLoadingScores(true);
     try {
-      const response = await fetch(`${process.env.NODE_ENV === 'development' ? 'http://localhost:5000/api' : "https://horse-betting-backend.onrender.com/api"}/race-days/${raceDate}/scores`);
+      const response = await fetch(`${API_BASE}/race-days/${raceDate}/scores`);
       console.log('Response status:', response.status);
       if (response.ok) {
         const data = await response.json();
