@@ -81,6 +81,9 @@ def apply_migrations(app):
                 conn.execute(text("ALTER TABLE races ADD COLUMN IF NOT EXISTS last_horse_number INTEGER"))
                 conn.execute(text("ALTER TABLE horses ADD COLUMN IF NOT EXISTS scratched BOOLEAN DEFAULT FALSE"))
                 conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN DEFAULT FALSE"))
+                conn.execute(text("ALTER TABLE races ADD COLUMN IF NOT EXISTS name VARCHAR"))
+                conn.execute(text("ALTER TABLE races ADD COLUMN IF NOT EXISTS time VARCHAR"))
+                conn.execute(text("ALTER TABLE races ADD COLUMN IF NOT EXISTS distance VARCHAR"))
                 conn.commit()
         except Exception as e:
             print(f"[Migration] {e}")

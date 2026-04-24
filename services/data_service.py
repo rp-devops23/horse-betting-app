@@ -149,6 +149,9 @@ class DataService:
             races_data.append({
                 "id": race.id,
                 "raceNumber": race.race_number,
+                "name": race.name,
+                "time": race.time,
+                "distance": race.distance,
                 "status": race.status,
                 "winner": race.winner_horse_number,
                 "lastHorse": race.last_horse_number,
@@ -214,6 +217,9 @@ class DataService:
                     id=race_data['id'],
                     date=race_date,
                     race_number=race_number,
+                    name=race_data.get('name'),
+                    time=race_data.get('time'),
+                    distance=race_data.get('distance'),
                     status=race_data.get('status', 'upcoming'),
                     winner_horse_number=race_data.get('winner')
                 )

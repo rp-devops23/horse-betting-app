@@ -123,17 +123,23 @@ def scrape_horses_from_smspariaz():
                 race_time = "TBD"
                 race_title = f"Race {race_number}"
                 
+                race_distance = None
                 if title_div:
                     title_text = title_div.get_text(strip=True)
-                    
+
                     # Extract time and title from format: "12:45 - FASHION HEIGHTS - MIA BIJOUX CUP - [0 - 25] - 1400m"
                     time_match = re.search(r'^(\d{1,2}:\d{2})', title_text)
                     if time_match:
                         race_time = time_match.group(1)
-                        # Remove the time from the title to get the race name
                         race_title = title_text.replace(f"{race_time} - ", "").strip()
                     else:
                         race_title = title_text
+
+                    # Extract distance (e.g. "1400m") and strip it from the name
+                    dist_match = re.search(r'(\d{3,5}m)\s*$', race_title)
+                    if dist_match:
+                        race_distance = dist_match.group(1)
+                        race_title = race_title[:dist_match.start()].rstrip(' -')
                 
                 # Extract horses for this race
                 horses = []
@@ -203,6 +209,7 @@ def scrape_horses_from_smspariaz():
                     "id": f"smspariaz_{race_index}_{datetime.now().strftime('%Y%m%d')}",
                     "name": race_title,
                     "time": race_time,
+                    "distance": race_distance,
                     "horses": horses,
                     "winner": None,
                     "status": "upcoming"

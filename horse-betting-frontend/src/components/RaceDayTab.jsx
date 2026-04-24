@@ -1,5 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, ChevronDown, Trophy, Edit3, X, Star, Check, AlertCircle, Flag } from 'lucide-react';
+import { Calendar, ChevronDown, Trophy, Edit3, X, Star, Check, AlertCircle, Flag, Lock } from 'lucide-react';
+
+// Returns true if it's past the race start time in Mauritius (GMT+4)
+const isRaceTimeLocked = (raceTime, raceDate) => {
+  if (!raceTime || raceTime === 'TBD' || !raceDate) return false;
+  const now = new Date();
+  // Shift to Mauritius time (UTC+4)
+  const muNow = new Date(now.getTime() + 4 * 60 * 60 * 1000);
+  const muDateStr = muNow.toISOString().slice(0, 10);
+  // Only lock today's races
+  if (raceDate !== muDateStr) return false;
+  const [raceH, raceM] = raceTime.split(':').map(Number);
+  const muH = muNow.getUTCHours();
+  const muMin = muNow.getUTCMinutes();
+  return muH * 60 + muMin >= raceH * 60 + raceM;
+};
 import API_BASE from '../config';
 import { initials, getUserColour } from '../utils/userColors';
 
@@ -175,37 +190,51 @@ const RaceDayTab = ({
           {races.map(race => {
             const myBet = bets?.find(b => String(b.userId) === String(selectedUserId) && b.raceId === race.id);
             const isBanker = bankers && selectedUserId && bankers[String(selectedUserId)] === race.id;
-            const canBet = !!selectedUserId && race.status !== 'completed';
+            const timeLocked = isRaceTimeLocked(race.time, selectedRaceDay);
+            const canBet = !!selectedUserId && race.status !== 'completed' && !timeLocked;
 
             return (
               <div key={race.id} className="bg-gray-50 p-4 rounded-lg shadow-sm">
 
                 {/* Race header */}
                 <div className="flex items-center justify-between mb-3">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-lg text-indigo-600">Race {race.raceNumber || race.id}</span>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold text-lg text-indigo-600">Course {race.raceNumber || race.id}</span>
+                      {race.time && (
+                        <span className="flex items-center gap-1 text-gray-600 text-sm font-medium">
+                          {timeLocked
+                            ? <Lock className="w-3.5 h-3.5 text-red-400" />
+                            : null}
+                          {race.time}
+                        </span>
+                      )}
+                      {race.distance && (
+                        <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{race.distance}</span>
+                      )}
                       {race.winner && (
                         <span className="flex items-center gap-1 text-yellow-600 text-xs font-medium">
                           <Trophy className="w-3.5 h-3.5" />#{race.winner}
                         </span>
                       )}
                     </div>
-                    {race.name && <p className="text-sm text-gray-500 mt-0.5">{race.name}</p>}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {race.time && (
-                      <span className="text-sm text-gray-600 bg-white px-2 py-1 rounded">{race.time}</span>
+                    {race.name && <p className="text-xs text-gray-400 mt-0.5 truncate">{race.name}</p>}
+                    {timeLocked && race.status !== 'completed' && (
+                      <p className="text-xs text-red-400 mt-0.5 flex items-center gap-1">
+                        <Lock className="w-3 h-3" /> Paris verrouillés — course démarrée
+                      </p>
                     )}
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
                     {/* Banker star */}
                     {selectedUserId && (
                       <button
                         onClick={() => handleSetBanker(race.id)}
-                        disabled={race.status === 'completed'}
+                        disabled={race.status === 'completed' || timeLocked}
                         className={`p-2 rounded-full transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
                           isBanker ? 'text-yellow-500 bg-yellow-100' : 'text-gray-300 hover:text-yellow-400'
                         }`}
-                        title={isBanker ? 'Remove banker (2× score)' : 'Set as banker (2× score)'}
+                        title={isBanker ? 'Retirer banker (×2)' : 'Définir comme banker (×2)'}
                       >
                         <Star className={`w-5 h-5 ${isBanker ? 'fill-yellow-500' : ''}`} />
                       </button>
