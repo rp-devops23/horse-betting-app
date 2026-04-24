@@ -14,17 +14,25 @@ def admin_login():
         return jsonify({"success": True}), 200
     return jsonify({"success": False, "error": "Invalid password"}), 401
 
+@admin_bp.route('/users', methods=['GET'])
+def get_users_with_pins():
+    """Returns all users with their PINs (admin only)."""
+    from models import User
+    users = User.query.order_by(User.name).all()
+    return jsonify([{'id': u.id, 'name': u.name, 'pin': u.pin} for u in users])
+
 @admin_bp.route('/users', methods=['PUT'])
 def update_user():
-    """Updates a user's name."""
+    """Updates a user's name and/or PIN."""
     data = request.json
     user_id = data.get('userId')
     name = data.get('name')
-    
-    if not user_id or not name:
-        return jsonify({"error": "User ID and name are required"}), 400
-    
-    success = data_service.update_user(user_id, name)
+    pin = data.get('pin')
+
+    if not user_id or (not name and not pin):
+        return jsonify({"error": "User ID and at least one of name or PIN are required"}), 400
+
+    success = data_service.update_user(user_id, name, pin)
     if success:
         return jsonify({"success": True, "message": f"User {user_id} updated successfully."}), 200
     else:

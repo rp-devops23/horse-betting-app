@@ -1,128 +1,83 @@
-import React, { useState, useRef } from 'react';
-import { Settings, Users, Plus, Calendar, Database, Edit2, Trash2, Check, X, LogOut, Download, Upload } from 'lucide-react';
-
+import React, { useState, useRef, useEffect } from 'react';
+import { Settings, Users, Plus, Calendar, Edit2, Trash2, Check, X, LogOut, Download, Upload, Eye, EyeOff } from 'lucide-react';
 import API_BASE from '../config';
+import { BADGE_COLOURS, initials } from '../utils/userColors';
 
-const AdminTab = ({ newUserName, setNewUserName, newUserPin, setNewUserPin, handleAddUser, handleUpdateUser, handleDeleteUser, users, clearAllUserData, handleAdminLogout,
-  backendFiles, setBackendFiles, selectedFile, setSelectedFile,
-  editingContent, setEditingContent, isEditing, setIsEditing, loadingFiles, setLoadingFiles,
-  loadingFile, setLoadingFile, savingFile, setSavingFile, showMessage, fetchAllData }) => {
-  
+const AdminTab = ({
+  newUserName, setNewUserName, newUserPin, setNewUserPin,
+  handleAddUser, handleUpdateUser, handleDeleteUser,
+  users, clearAllUserData, handleAdminLogout, showMessage, fetchAllData,
+}) => {
   const [editingUserId, setEditingUserId] = useState(null);
   const [editingUserName, setEditingUserName] = useState('');
+  const [editingUserPin, setEditingUserPin] = useState('');
+  const [usersWithPins, setUsersWithPins] = useState([]);
+  const [showPins, setShowPins] = useState({}); // { userId: true/false }
   const [restoring, setRestoring] = useState(false);
   const restoreInputRef = useRef(null);
 
-  const handleStartEdit = (userId, currentName) => {
-    setEditingUserId(userId);
-    setEditingUserName(currentName);
+  // Fetch users with PINs whenever the users list changes
+  useEffect(() => {
+    const fetchUsersWithPins = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/admin/users`);
+        if (res.ok) setUsersWithPins(await res.json());
+      } catch { /* silently ignore */ }
+    };
+    fetchUsersWithPins();
+  }, [users]);
+
+  const getPinForUser = (userId) =>
+    usersWithPins.find(u => String(u.id) === String(userId))?.pin ?? '····';
+
+  const handleStartEdit = (user) => {
+    setEditingUserId(user.id);
+    setEditingUserName(user.name);
+    setEditingUserPin('');
   };
 
   const handleCancelEdit = () => {
     setEditingUserId(null);
     setEditingUserName('');
+    setEditingUserPin('');
   };
 
   const handleSaveEdit = async () => {
     if (!editingUserName.trim()) {
-      showMessage('Please enter a valid user name.', 'info');
+      showMessage('Veuillez saisir un nom valide.', 'info');
       return;
     }
-    await handleUpdateUser(editingUserId, editingUserName);
+    await handleUpdateUser(editingUserId, editingUserName, editingUserPin || null);
     setEditingUserId(null);
     setEditingUserName('');
+    setEditingUserPin('');
   };
 
-  const handleLoadFiles = async () => {
-    setLoadingFiles(true);
-    try {
-      const res = await fetch(`${API_BASE}/admin/files`);
-      const data = await res.json();
-      if (data.success) {
-        setBackendFiles(data.files);
-        showMessage("File list loaded.", "success");
-      } else {
-        showMessage(data.error, "error");
-      }
-    } catch (error) {
-      showMessage(`Failed to load file list: ${error.message}`, "error");
-    } finally {
-      setLoadingFiles(false);
-    }
-  };
+  const toggleShowPin = (userId) =>
+    setShowPins(prev => ({ ...prev, [userId]: !prev[userId] }));
 
-  const handleLoadFileContent = async () => {
-    if (!selectedFile) return;
-    setLoadingFile(true);
-    try {
-      const res = await fetch(`${API_BASE}/admin/files/${selectedFile}`);
-      const data = await res.json();
-      if (data.success) {
-        setEditingContent(JSON.stringify(data.content, null, 2));
-        setIsEditing(true);
-        showMessage("File loaded for editing.", "success");
-      } else {
-        showMessage(data.error, "error");
-      }
-    } catch (error) {
-      showMessage(`Failed to load file content: ${error.message}`, "error");
-    } finally {
-      setLoadingFile(false);
-    }
-  };
-
-  const handleSaveFileContent = async () => {
-    if (!selectedFile || !isEditing) return;
-    setSavingFile(true);
-    try {
-      const res = await fetch(`${API_BASE}/admin/files/${selectedFile}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: editingContent
-      });
-      const data = await res.json();
-      if (data.success) {
-        showMessage("File saved successfully!", "success");
-        setIsEditing(false); // Exit edit mode
-      } else {
-        showMessage(data.error, "error");
-      }
-    } catch (error) {
-      showMessage(`Failed to save file: ${error.message}`, "error");
-    } finally {
-      setSavingFile(false);
-    }
-  };
-
-  const handleDownloadBackup = () => {
-    window.open(`${API_BASE}/admin/backup`, '_blank');
-  };
+  const handleDownloadBackup = () => window.open(`${API_BASE}/admin/backup`, '_blank');
 
   const handleRestoreBackup = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    if (!window.confirm('This will WIPE the entire database and replace it with the backup. Are you sure?')) {
+    if (!window.confirm('Ceci va ÉCRASER toute la base de données avec la sauvegarde. Continuer ?')) {
       e.target.value = '';
       return;
     }
     setRestoring(true);
     try {
-      const text = await file.text();
-      const backup = JSON.parse(text);
+      const backup = JSON.parse(await file.text());
       const res = await fetch(`${API_BASE}/admin/restore`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(backup),
       });
       const data = await res.json();
-      if (res.ok) {
-        showMessage('Database restored successfully!', 'success');
-        fetchAllData();
-      } else {
-        showMessage(data.error || 'Restore failed.', 'error');
-      }
+      if (res.ok) { showMessage('Base restaurée avec succès !', 'success'); fetchAllData(); }
+      else showMessage(data.error || 'Restauration échouée.', 'error');
     } catch (err) {
-      showMessage(`Restore error: ${err.message}`, 'error');
+      showMessage(`Erreur : ${err.message}`, 'error');
     } finally {
       setRestoring(false);
       e.target.value = '';
@@ -133,60 +88,42 @@ const AdminTab = ({ newUserName, setNewUserName, newUserPin, setNewUserPin, hand
     try {
       const res = await fetch(`${API_BASE}/races/scrape`, { method: 'POST' });
       const data = await res.json();
-      if (data.success) {
-        showMessage("Scraped new race day!", "success");
-        fetchAllData();
-      } else {
-        showMessage(data.error, "error");
-      }
-    } catch (error) {
-      showMessage(`Failed to scrape races: ${error.message}`, "error");
-    }
-  };
-
-  const handleScrapeResults = async () => {
-    try {
-      const res = await fetch(`${API_BASE}/races/results`, { method: 'POST' });
-      const data = await res.json();
-      if (data.success) {
-        showMessage("Scraped race results!", "success");
-        fetchAllData();
-      } else {
-        showMessage(data.error, "error");
-      }
-    } catch (error) {
-      showMessage(`Failed to scrape results: ${error.message}`, "error");
-    }
+      if (data.success) { showMessage('Courses scrapées !', 'success'); fetchAllData(); }
+      else showMessage(data.error, 'error');
+    } catch (err) { showMessage(`Erreur : ${err.message}`, 'error'); }
   };
 
   return (
     <div className="bg-white p-6 rounded-b-lg shadow-lg space-y-6">
-      <div className="flex items-center justify-between mb-4">
+
+      {/* Header */}
+      <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold flex items-center gap-2 text-indigo-700">
           <Settings className="w-6 h-6" />
-          Admin Panel
+          Admin
         </h2>
         <button
           onClick={handleAdminLogout}
           className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors"
-          title="Logout from admin"
         >
           <LogOut className="w-4 h-4" />
-          Logout
+          Déconnexion
         </button>
       </div>
+
+      {/* ── User Management ── */}
       <div className="bg-gray-100 p-4 rounded-lg space-y-4">
         <h3 className="font-bold text-lg flex items-center gap-2 text-indigo-600">
           <Users className="w-5 h-5" />
-          User Management
+          Utilisateurs
         </h3>
-        
-        {/* Add New User */}
+
+        {/* Add user */}
         <div className="flex items-center gap-2">
           <input
             type="text"
-            className="flex-1 p-2 border rounded-md"
-            placeholder="Name"
+            className="flex-1 p-2 border rounded-md text-sm"
+            placeholder="Prénom"
             value={newUserName}
             onChange={(e) => setNewUserName(e.target.value)}
           />
@@ -194,7 +131,7 @@ const AdminTab = ({ newUserName, setNewUserName, newUserPin, setNewUserPin, hand
             type="password"
             inputMode="numeric"
             maxLength={4}
-            className="w-20 p-2 border rounded-md text-center tracking-widest"
+            className="w-20 p-2 border rounded-md text-center tracking-widest text-sm"
             placeholder="PIN"
             value={newUserPin}
             onChange={(e) => setNewUserPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
@@ -204,150 +141,111 @@ const AdminTab = ({ newUserName, setNewUserName, newUserPin, setNewUserPin, hand
           </button>
         </div>
 
-        {/* User List */}
+        {/* User list */}
         {users.length > 0 && (
           <div className="space-y-2">
-            <h4 className="font-semibold text-gray-700">Current Users:</h4>
-            <div className="space-y-2 max-h-60 overflow-y-auto">
-              {users.map(user => (
-                <div key={user.id} className="flex items-center gap-2 p-2 bg-white rounded-md border">
+            {users.map((user, index) => {
+              const colour = BADGE_COLOURS[index % BADGE_COLOURS.length];
+              const pin = getPinForUser(user.id);
+              const pinVisible = showPins[user.id];
+
+              return (
+                <div key={user.id} className="bg-white rounded-md border p-2">
                   {editingUserId === user.id ? (
-                    <>
+                    <div className="flex items-center gap-2">
+                      <span className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white ${colour}`}>
+                        {initials(editingUserName || user.name)}
+                      </span>
                       <input
                         type="text"
                         value={editingUserName}
                         onChange={(e) => setEditingUserName(e.target.value)}
                         className="flex-1 p-1 border rounded text-sm"
+                        placeholder="Prénom"
                         autoFocus
                       />
-                      <button
-                        onClick={handleSaveEdit}
-                        className="p-1 text-green-600 hover:bg-green-100 rounded"
-                        title="Save"
-                      >
+                      <input
+                        type="password"
+                        inputMode="numeric"
+                        maxLength={4}
+                        value={editingUserPin}
+                        onChange={(e) => setEditingUserPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                        className="w-16 p-1 border rounded text-sm text-center tracking-widest"
+                        placeholder="PIN"
+                      />
+                      <button onClick={handleSaveEdit} className="p-1 text-green-600 hover:bg-green-100 rounded" title="Enregistrer">
                         <Check className="w-4 h-4" />
                       </button>
-                      <button
-                        onClick={handleCancelEdit}
-                        className="p-1 text-gray-600 hover:bg-gray-100 rounded"
-                        title="Cancel"
-                      >
+                      <button onClick={handleCancelEdit} className="p-1 text-gray-500 hover:bg-gray-100 rounded" title="Annuler">
                         <X className="w-4 h-4" />
                       </button>
-                    </>
+                    </div>
                   ) : (
-                    <>
+                    <div className="flex items-center gap-2">
+                      <span className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white ${colour}`}>
+                        {initials(user.name)}
+                      </span>
                       <span className="flex-1 text-sm font-medium">{user.name}</span>
-                      <button
-                        onClick={() => handleStartEdit(user.id, user.name)}
-                        className="p-1 text-blue-600 hover:bg-blue-100 rounded"
-                        title="Edit user"
-                      >
+                      {/* PIN display */}
+                      <span className="text-sm font-mono text-gray-500 w-12 text-center">
+                        {pinVisible ? pin : '••••'}
+                      </span>
+                      <button onClick={() => toggleShowPin(user.id)} className="p-1 text-gray-400 hover:text-gray-700 rounded" title={pinVisible ? 'Masquer PIN' : 'Voir PIN'}>
+                        {pinVisible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                      <button onClick={() => handleStartEdit(user)} className="p-1 text-blue-600 hover:bg-blue-100 rounded" title="Modifier">
                         <Edit2 className="w-4 h-4" />
                       </button>
-                      <button
-                        onClick={() => handleDeleteUser(user.id)}
-                        className="p-1 text-red-600 hover:bg-red-100 rounded"
-                        title="Delete user"
-                      >
+                      <button onClick={() => handleDeleteUser(user.id)} className="p-1 text-red-600 hover:bg-red-100 rounded" title="Supprimer">
                         <Trash2 className="w-4 h-4" />
                       </button>
-                    </>
+                    </div>
                   )}
                 </div>
-              ))}
-            </div>
+              );
+            })}
           </div>
         )}
 
-        <button onClick={clearAllUserData} className="w-full bg-red-500 text-white p-2 rounded-md hover:bg-red-600 transition-colors">
-          Clear ALL User Data
+        <button onClick={clearAllUserData} className="w-full bg-red-500 text-white p-2 rounded-md hover:bg-red-600 transition-colors text-sm">
+          Effacer TOUTES les données utilisateurs
         </button>
       </div>
 
+      {/* ── Race Day Management ── */}
       <div className="bg-gray-100 p-4 rounded-lg space-y-4">
         <h3 className="font-bold text-lg flex items-center gap-2 text-indigo-600">
           <Calendar className="w-5 h-5" />
-          Race Day Management
+          Journées de courses
         </h3>
-        <button onClick={handleScrapeRaces} className="w-full bg-indigo-500 text-white p-2 rounded-md hover:bg-indigo-600 transition-colors">
-          Scrape New Races
-        </button>
-        <button onClick={handleScrapeResults} className="w-full bg-indigo-500 text-white p-2 rounded-md hover:bg-indigo-600 transition-colors">
-          Scrape Results
+        <button onClick={handleScrapeRaces} className="w-full bg-indigo-500 text-white p-2 rounded-md hover:bg-indigo-600 transition-colors text-sm">
+          Scraper les nouvelles courses
         </button>
       </div>
 
+      {/* ── Backup & Restore ── */}
       <div className="bg-gray-100 p-4 rounded-lg space-y-4">
         <h3 className="font-bold text-lg flex items-center gap-2 text-indigo-600">
           <Download className="w-5 h-5" />
-          Backup &amp; Restore
+          Sauvegarde &amp; Restauration
         </h3>
-        <button onClick={handleDownloadBackup} className="w-full flex items-center justify-center gap-2 bg-indigo-500 text-white p-2 rounded-md hover:bg-indigo-600 transition-colors">
+        <button onClick={handleDownloadBackup} className="w-full flex items-center justify-center gap-2 bg-indigo-500 text-white p-2 rounded-md hover:bg-indigo-600 transition-colors text-sm">
           <Download className="w-4 h-4" />
-          Download Backup
+          Télécharger la sauvegarde
         </button>
         <div>
-          <input
-            type="file"
-            accept=".json"
-            ref={restoreInputRef}
-            onChange={handleRestoreBackup}
-            className="hidden"
-          />
+          <input type="file" accept=".json" ref={restoreInputRef} onChange={handleRestoreBackup} className="hidden" />
           <button
             onClick={() => restoreInputRef.current?.click()}
             disabled={restoring}
-            className="w-full flex items-center justify-center gap-2 bg-red-500 text-white p-2 rounded-md hover:bg-red-600 transition-colors disabled:opacity-50"
+            className="w-full flex items-center justify-center gap-2 bg-red-500 text-white p-2 rounded-md hover:bg-red-600 transition-colors disabled:opacity-50 text-sm"
           >
             <Upload className="w-4 h-4" />
-            {restoring ? 'Restoring...' : 'Restore from Backup'}
+            {restoring ? 'Restauration…' : 'Restaurer depuis une sauvegarde'}
           </button>
         </div>
       </div>
 
-      <div className="bg-gray-100 p-4 rounded-lg space-y-4">
-        <h3 className="font-bold text-lg flex items-center gap-2 text-indigo-600">
-          <Database className="w-5 h-5" />
-          File Management
-        </h3>
-        <button onClick={handleLoadFiles} className="w-full bg-gray-500 text-white p-2 rounded-md hover:bg-gray-600 transition-colors">
-          {loadingFiles ? "Loading..." : "Load Files"}
-        </button>
-        {backendFiles.length > 0 && (
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-700">Select a file to view:</label>
-            <select
-              className="w-full p-2 border rounded-md"
-              value={selectedFile || ''}
-              onChange={(e) => {
-                setSelectedFile(e.target.value);
-                setIsEditing(false); // Reset edit mode on file change
-              }}
-            >
-              <option value="">-- Select a file --</option>
-              {backendFiles.map(file => (
-                <option key={file.path} value={file.path}>{file.path}</option>
-              ))}
-            </select>
-            <div className="flex gap-2 mt-2">
-              <button onClick={handleLoadFileContent} className="flex-1 bg-blue-500 text-white p-2 rounded-md hover:bg-blue-600 transition-colors" disabled={loadingFile || !selectedFile}>
-                {loadingFile ? "Loading..." : "Load File"}
-              </button>
-              <button onClick={handleSaveFileContent} className="flex-1 bg-green-500 text-white p-2 rounded-md hover:bg-green-600 transition-colors" disabled={savingFile || !isEditing}>
-                {savingFile ? "Saving..." : "Save File"}
-              </button>
-            </div>
-            {isEditing && (
-              <textarea
-                className="w-full h-64 p-2 border rounded-md font-mono text-sm mt-4"
-                value={editingContent}
-                onChange={(e) => setEditingContent(e.target.value)}
-              ></textarea>
-            )}
-          </div>
-        )}
-      </div>
     </div>
   );
 };

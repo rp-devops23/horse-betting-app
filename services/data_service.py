@@ -73,12 +73,15 @@ class DataService:
             db.session.rollback()
             return False
 
-    def update_user(self, user_id: str, name: str) -> bool:
-        """Update a user's name in the database."""
+    def update_user(self, user_id: str, name: str = None, pin: str = None) -> bool:
+        """Update a user's name and/or PIN in the database."""
         try:
             user = User.query.get(user_id)
             if user:
-                user.name = name
+                if name:
+                    user.name = name
+                if pin:
+                    user.pin = pin
                 db.session.commit()
                 return True
             return False

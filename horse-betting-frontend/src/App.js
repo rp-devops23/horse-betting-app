@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Trophy, Settings, Activity, Home, Menu, X } from 'lucide-react';
 
 import HomePage from './components/HomePage.jsx';
@@ -36,18 +36,14 @@ const HorseBettingApp = () => {
   const [registerName, setRegisterName] = useState('');
   const [registerPin, setRegisterPin] = useState('');
 
+  // User picker dropdown
+  const [userPickerOpen, setUserPickerOpen] = useState(false);
+  const userPickerRef = useRef(null);
+
   // Admin tab state
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
   const [adminPassword, setAdminPassword] = useState('');
   const [showAdminLogin, setShowAdminLogin] = useState(false);
-  const [backendFiles, setBackendFiles] = useState([]);
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [fileContent, setFileContent] = useState('');
-  const [editingContent, setEditingContent] = useState('');
-  const [isEditing, setIsEditing] = useState(false);
-  const [loadingFiles, setLoadingFiles] = useState(false);
-  const [loadingFile, setLoadingFile] = useState(false);
-  const [savingFile, setSavingFile] = useState(false);
 
   const showMessage = useCallback((text, type = 'info') => {
     setMessage({ text, type });
@@ -157,30 +153,33 @@ const HorseBettingApp = () => {
     }
   }, [newUserName, newUserPin, setUsers, setNewUserName, showMessage]);
 
-  const handleUpdateUser = useCallback(async (userId, newName) => {
-    if (!newName.trim()) {
-      showMessage('Please enter a valid user name.', 'info');
+  const handleUpdateUser = useCallback(async (userId, newName, newPin = null) => {
+    if (!newName?.trim() && !newPin) {
+      showMessage('Veuillez saisir un nom ou un PIN.', 'info');
       return;
     }
     try {
+      const body = { userId };
+      if (newName?.trim()) body.name = newName.trim();
+      if (newPin) body.pin = newPin;
       const response = await fetch(`${API_BASE}/admin/users`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, name: newName })
+        body: JSON.stringify(body),
       });
       const data = await response.json();
       if (data.success) {
-        setUsers(prevUsers => 
-          prevUsers.map(user => 
-            user.id === userId ? { ...user, name: newName } : user
-          )
-        );
-        showMessage('User updated successfully!', 'success');
+        if (newName?.trim()) {
+          setUsers(prevUsers =>
+            prevUsers.map(user => user.id === userId ? { ...user, name: newName.trim() } : user)
+          );
+        }
+        showMessage('Utilisateur mis à jour !', 'success');
       } else {
         showMessage(data.error, 'error');
       }
     } catch (error) {
-      showMessage(`Error updating user: ${error.message}`, 'error');
+      showMessage(`Erreur : ${error.message}`, 'error');
     }
   }, [showMessage]);
 
@@ -394,6 +393,17 @@ const HorseBettingApp = () => {
     }
   }, [registerName, registerPin, fetchAllData, showMessage]);
 
+  // Close user picker when clicking outside
+  useEffect(() => {
+    const handler = (e) => {
+      if (userPickerRef.current && !userPickerRef.current.contains(e.target)) {
+        setUserPickerOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
   const MessageBox = ({ text, type }) => {
     const bgColor = type === 'error' ? 'bg-red-500' : type === 'success' ? 'bg-green-500' : 'bg-blue-500';
     return (
@@ -420,57 +430,74 @@ const HorseBettingApp = () => {
         {/* User selector bar */}
         <div className="flex items-center justify-center mb-6">
           {selectedUserId ? (
+            /* Logged in: badge + full name + Switch */
             <div className="flex items-center gap-2">
               <span className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-white ${getUserColour(users, selectedUserId)}`}>
                 {initials(users.find(u => u.id === selectedUserId)?.name || '')}
               </span>
               <span className="font-bold text-indigo-700">{users.find(u => u.id === selectedUserId)?.name}</span>
-              <button onClick={handleUserLogout} className="text-xs text-gray-400 hover:text-red-500 underline transition-colors ml-1">Switch</button>
+              <button onClick={handleUserLogout} className="text-xs text-gray-400 hover:text-red-500 underline transition-colors ml-1">Changer</button>
             </div>
           ) : (
-            <div className="text-center">
-              <div className="flex flex-wrap justify-center gap-3 mb-3">
-                {users.map((user, index) => (
-                  <button
-                    key={user.id}
-                    onClick={() => handleUserSelect(user.id)}
-                    title={user.name}
-                    className={`w-12 h-12 rounded-full flex items-center justify-center text-sm font-bold text-white shadow-md hover:scale-110 transition-transform ${BADGE_COLOURS[index % BADGE_COLOURS.length]}`}
-                  >
-                    {initials(user.name)}
-                  </button>
-                ))}
-              </div>
-              {!showRegisterForm ? (
-                <button
-                  onClick={() => setShowRegisterForm(true)}
-                  className="text-sm text-indigo-500 hover:text-indigo-700 underline transition-colors"
-                >
-                  New here? Create your account
-                </button>
-              ) : (
-                <div className="mt-3 p-4 bg-white rounded-lg shadow-md max-w-xs mx-auto">
-                  <p className="text-sm font-semibold text-indigo-700 mb-3">Create your account</p>
-                  <input
-                    type="text"
-                    placeholder="Your name"
-                    value={registerName}
-                    onChange={e => setRegisterName(e.target.value)}
-                    className="w-full p-2 border border-gray-300 rounded-md text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
-                  <input
-                    type="password"
-                    inputMode="numeric"
-                    maxLength={4}
-                    placeholder="Choose a 4-digit PIN"
-                    value={registerPin}
-                    onChange={e => setRegisterPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                    onKeyPress={e => e.key === 'Enter' && handleRegister()}
-                    className="w-full p-2 border border-gray-300 rounded-md text-sm mb-3 text-center tracking-widest focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
-                  <div className="flex gap-2">
-                    <button onClick={handleRegister} className="flex-1 bg-indigo-600 text-white py-2 rounded-md text-sm hover:bg-indigo-700 transition-colors">Join</button>
-                    <button onClick={() => { setShowRegisterForm(false); setRegisterName(''); setRegisterPin(''); }} className="flex-1 bg-gray-200 text-gray-700 py-2 rounded-md text-sm hover:bg-gray-300 transition-colors">Cancel</button>
+            /* Not logged in: deployable dropdown */
+            <div ref={userPickerRef} className="relative w-full max-w-xs">
+              <button
+                onClick={() => { setUserPickerOpen(o => !o); setShowRegisterForm(false); }}
+                className="w-full flex items-center justify-between px-4 py-2.5 bg-white border border-gray-300 rounded-lg shadow-sm text-gray-600 hover:border-indigo-400 transition-colors"
+              >
+                <span className="text-sm font-medium">Choisir un joueur</span>
+                <span className="text-gray-400 text-xs">{userPickerOpen ? '▲' : '▼'}</span>
+              </button>
+
+              {userPickerOpen && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-20 overflow-hidden">
+                  {users.map((user, index) => (
+                    <button
+                      key={user.id}
+                      onClick={() => { handleUserSelect(user.id); setUserPickerOpen(false); }}
+                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-indigo-50 transition-colors text-left"
+                    >
+                      <span className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0 ${BADGE_COLOURS[index % BADGE_COLOURS.length]}`}>
+                        {initials(user.name)}
+                      </span>
+                      <span className="font-medium text-gray-800">{user.name}</span>
+                    </button>
+                  ))}
+                  <div className="border-t border-gray-100">
+                    {!showRegisterForm ? (
+                      <button
+                        onClick={() => setShowRegisterForm(true)}
+                        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-indigo-500 text-sm"
+                      >
+                        <span className="w-8 h-8 rounded-full border-2 border-dashed border-indigo-300 flex items-center justify-center text-indigo-400 font-bold flex-shrink-0">+</span>
+                        Créer un compte
+                      </button>
+                    ) : (
+                      <div className="p-4 space-y-2">
+                        <p className="text-sm font-semibold text-indigo-700">Créer un compte</p>
+                        <input
+                          type="text"
+                          placeholder="Ton prénom"
+                          value={registerName}
+                          onChange={e => setRegisterName(e.target.value)}
+                          className="w-full p-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                        <input
+                          type="password"
+                          inputMode="numeric"
+                          maxLength={4}
+                          placeholder="PIN à 4 chiffres"
+                          value={registerPin}
+                          onChange={e => setRegisterPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                          onKeyPress={e => e.key === 'Enter' && handleRegister()}
+                          className="w-full p-2 border border-gray-300 rounded-md text-sm text-center tracking-widest focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                        <div className="flex gap-2">
+                          <button onClick={handleRegister} className="flex-1 bg-indigo-600 text-white py-2 rounded-md text-sm hover:bg-indigo-700 transition-colors">Rejoindre</button>
+                          <button onClick={() => { setShowRegisterForm(false); setRegisterName(''); setRegisterPin(''); }} className="flex-1 bg-gray-200 text-gray-700 py-2 rounded-md text-sm hover:bg-gray-300 transition-colors">Annuler</button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -581,22 +608,6 @@ const HorseBettingApp = () => {
                 users={users}
                 clearAllUserData={clearAllUserData}
                 handleAdminLogout={handleAdminLogout}
-                backendFiles={backendFiles}
-                setBackendFiles={setBackendFiles}
-                selectedFile={selectedFile}
-                setSelectedFile={setSelectedFile}
-                fileContent={fileContent}
-                setFileContent={setFileContent}
-                editingContent={editingContent}
-                setEditingContent={setEditingContent}
-                isEditing={isEditing}
-                setIsEditing={setIsEditing}
-                loadingFiles={loadingFiles}
-                setLoadingFiles={setLoadingFiles}
-                loadingFile={loadingFile}
-                setLoadingFile={setLoadingFile}
-                savingFile={savingFile}
-                setSavingFile={setSavingFile}
                 showMessage={showMessage}
                 fetchAllData={fetchAllData}
               />
