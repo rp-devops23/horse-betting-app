@@ -178,74 +178,69 @@ class DataService:
         }
 
     def save_current_race_day_data(self, day_data: Dict[str, Any]) -> bool:
-        """Saves a race day structure to the database, first clearing existing data for that day."""
+        """Upserts race day data — updates metadata and odds without touching existing bets."""
         try:
             race_date = day_data.get('date')
             if not race_date:
                 logger.error("No date provided in day data.")
                 return False
 
-            # Delete existing data for this race day
-            existing_races = Race.query.filter_by(date=race_date).all()
-            for race in existing_races:
-                # Delete related bets and horses
-                Bet.query.filter_by(race_id=race.id).delete()
-                Horse.query.filter_by(race_id=race.id).delete()
-                db.session.delete(race)
-
-            db.session.commit()
-            
-            # Insert new data
             for race_data in day_data.get('races', []):
-                # Extract race number from race_data ID (e.g., "smspariaz_R1_20250816" -> 1) 
-                # or from race name (e.g., "Race 1" -> 1)
-                race_number = 1
                 race_id = race_data.get('id', '')
                 race_name = race_data.get('name', '')
-                
-                # Try to extract from ID first
+
+                # Derive race number from ID or name
+                race_number = 1
                 match = re.search(r'R(\d+)', race_id, re.IGNORECASE)
                 if match:
                     race_number = int(match.group(1))
                 else:
-                    # Try to extract from name as fallback
                     match = re.search(r'Race\s+(\d+)', race_name, re.IGNORECASE)
                     if match:
                         race_number = int(match.group(1))
-                
-                new_race = Race(
-                    id=race_data['id'],
-                    date=race_date,
-                    race_number=race_number,
-                    name=race_data.get('name'),
-                    time=race_data.get('time'),
-                    distance=race_data.get('distance'),
-                    status=race_data.get('status', 'upcoming'),
-                    winner_horse_number=race_data.get('winner')
-                )
-                db.session.add(new_race)
 
-                for horse_data in race_data.get('horses', []):
-                    new_horse = Horse(
-                        id=str(uuid.uuid4()),
-                        race_id=new_race.id,
-                        horse_number=horse_data['number'],
-                        name=horse_data['name'],
-                        odds=horse_data['odds']
+                # Upsert race — update metadata if exists, create if not
+                existing_race = Race.query.get(race_id)
+                if existing_race:
+                    existing_race.name = race_data.get('name', existing_race.name)
+                    existing_race.time = race_data.get('time', existing_race.time)
+                    existing_race.distance = race_data.get('distance', existing_race.distance)
+                    # Don't overwrite winner/status set manually by admin
+                    if existing_race.status == 'upcoming':
+                        existing_race.status = race_data.get('status', 'upcoming')
+                    race_obj = existing_race
+                else:
+                    race_obj = Race(
+                        id=race_id,
+                        date=race_date,
+                        race_number=race_number,
+                        name=race_data.get('name'),
+                        time=race_data.get('time'),
+                        distance=race_data.get('distance'),
+                        status=race_data.get('status', 'upcoming'),
+                        winner_horse_number=race_data.get('winner')
                     )
-                    db.session.add(new_horse)
+                    db.session.add(race_obj)
 
-                if 'bets' in race_data:
-                    for user_id, horse_number in race_data['bets'].items():
-                        new_bet = Bet(
+                # Upsert horses — update odds/name if exists, create if not
+                # Bets are never touched
+                for horse_data in race_data.get('horses', []):
+                    existing_horse = Horse.query.filter_by(
+                        race_id=race_id, horse_number=horse_data['number']
+                    ).first()
+                    if existing_horse:
+                        existing_horse.name = horse_data['name']
+                        existing_horse.odds = horse_data['odds']
+                        # Don't overwrite manually-set scratched status
+                    else:
+                        db.session.add(Horse(
                             id=str(uuid.uuid4()),
-                            user_id=user_id,
-                            race_id=new_race.id,
-                            horse_number=horse_number,
-                            is_banker=False
-                        )
-                        db.session.add(new_bet)
-            
+                            race_id=race_id,
+                            horse_number=horse_data['number'],
+                            name=horse_data['name'],
+                            odds=horse_data['odds']
+                        ))
+
             db.session.commit()
             return True
         except Exception as e:
