@@ -7,6 +7,7 @@ import LeaderboardTab from './components/LeaderboardTab.jsx';
 import AdminTab from './components/AdminTab.jsx';
 
 import API_BASE from './config';
+import { BADGE_COLOURS, initials, getUserColour } from './utils/userColors';
 
 const HorseBettingApp = () => {
   const [activeTab, setActiveTab] = useState('home');
@@ -417,23 +418,26 @@ const HorseBettingApp = () => {
         </div>
 
         {/* User selector bar */}
-        <div className="flex items-center justify-center gap-3 mb-6">
+        <div className="flex items-center justify-center mb-6">
           {selectedUserId ? (
-            <>
-              <span className="text-gray-600 text-sm">Playing as</span>
+            <div className="flex items-center gap-2">
+              <span className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-white ${getUserColour(users, selectedUserId)}`}>
+                {initials(users.find(u => u.id === selectedUserId)?.name || '')}
+              </span>
               <span className="font-bold text-indigo-700">{users.find(u => u.id === selectedUserId)?.name}</span>
-              <button onClick={handleUserLogout} className="text-xs text-gray-400 hover:text-red-500 underline transition-colors">Switch</button>
-            </>
+              <button onClick={handleUserLogout} className="text-xs text-gray-400 hover:text-red-500 underline transition-colors ml-1">Switch</button>
+            </div>
           ) : (
             <div className="text-center">
-              <div className="flex flex-wrap justify-center gap-2 mb-3">
-                {users.map(user => (
+              <div className="flex flex-wrap justify-center gap-3 mb-3">
+                {users.map((user, index) => (
                   <button
                     key={user.id}
                     onClick={() => handleUserSelect(user.id)}
-                    className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium text-sm"
+                    title={user.name}
+                    className={`w-12 h-12 rounded-full flex items-center justify-center text-sm font-bold text-white shadow-md hover:scale-110 transition-transform ${BADGE_COLOURS[index % BADGE_COLOURS.length]}`}
                   >
-                    {user.name}
+                    {initials(user.name)}
                   </button>
                 ))}
               </div>

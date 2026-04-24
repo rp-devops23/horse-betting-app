@@ -1,14 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, ChevronDown, Trophy, Edit3, X, Star } from 'lucide-react';
 import API_BASE from '../config';
-
-// Consistent colour per user (by index in users array)
-const BADGE_COLOURS = [
-  'bg-pink-500', 'bg-violet-500', 'bg-blue-500', 'bg-emerald-500',
-  'bg-orange-500', 'bg-rose-500', 'bg-teal-500', 'bg-amber-500',
-];
-
-const initials = (name) => name.trim().slice(0, 2).toUpperCase();
+import { BADGE_COLOURS, initials, getUserColour } from '../utils/userColors';
 
 const SkeletonCard = () => (
   <div className="bg-white p-4 rounded-lg shadow animate-pulse">
@@ -109,8 +102,7 @@ const RaceDayTab = ({
           </div>
           <div className="flex flex-wrap gap-2">
             {raceDayScores.map((score, index) => {
-              const userIndex = users.findIndex(u => String(u.id) === String(score.userId));
-              const colour = BADGE_COLOURS[userIndex % BADGE_COLOURS.length] || 'bg-gray-500';
+              const colour = getUserColour(users, score.userId);
               const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : null;
               return (
                 <div key={score.userId} className="flex items-center gap-1.5 bg-white rounded-full px-3 py-1 shadow-sm border border-indigo-100">
@@ -271,8 +263,7 @@ const RaceDayTab = ({
                           {pickers.length > 0 && (
                             <div className="flex gap-1">
                               {pickers.map(u => {
-                                const ui = users.findIndex(x => x.id === u.id);
-                                const colour = BADGE_COLOURS[ui % BADGE_COLOURS.length] || 'bg-gray-500';
+                                  const colour = getUserColour(users, u.id);
                                 const isMe = String(u.id) === String(selectedUserId);
                                 return (
                                   <span
