@@ -596,6 +596,7 @@ const HorseBettingApp = () => {
                 handleUpdateUser={handleUpdateUser}
                 handleDeleteUser={handleDeleteUser}
                 users={users}
+                setUsers={setUsers}
                 clearAllUserData={clearAllUserData}
                 handleAdminLogout={handleAdminLogout}
                 showMessage={showMessage}

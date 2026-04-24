@@ -6,7 +6,7 @@ import { BADGE_COLOURS, initials } from '../utils/userColors';
 const AdminTab = ({
   newUserName, setNewUserName, newUserPin, setNewUserPin,
   handleAddUser, handleUpdateUser, handleDeleteUser,
-  users, clearAllUserData, handleAdminLogout, showMessage, fetchAllData,
+  users, clearAllUserData, handleAdminLogout, showMessage, fetchAllData, setUsers,
 }) => {
   const [editingUserId, setEditingUserId] = useState(null);
   const [editingUserName, setEditingUserName] = useState('');
@@ -118,7 +118,10 @@ const AdminTab = ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId, isAdmin: !currentIsAdmin }),
       });
-      if (res.ok) showMessage(!currentIsAdmin ? 'Accès admin accordé.' : 'Accès admin retiré.', 'success');
+      if (res.ok) {
+        showMessage(!currentIsAdmin ? 'Accès admin accordé.' : 'Accès admin retiré.', 'success');
+        setUsers(prev => prev.map(u => u.id === userId ? { ...u, is_admin: !currentIsAdmin } : u));
+      }
     } catch (e) {
       showMessage(`Erreur : ${e.message}`, 'error');
     }
