@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Trophy, Settings, Star, Activity, Home, Menu, X } from 'lucide-react';
+import { Trophy, Settings, Activity, Home, Menu, X } from 'lucide-react';
 
 import HomePage from './components/HomePage.jsx';
 import RaceDayTab from './components/RaceDayTab.jsx';
-import UserBetsTab from './components/UserBetsTab.jsx';
 import LeaderboardTab from './components/LeaderboardTab.jsx';
 import AdminTab from './components/AdminTab.jsx';
 
@@ -483,7 +482,6 @@ const HorseBettingApp = () => {
                 <span className="text-lg font-semibold text-indigo-700">
                   {activeTab === 'home' && 'Home'}
                   {activeTab === 'races' && 'Races'}
-                  {activeTab === 'bets' && 'Your Bets'}
                   {activeTab === 'leaderboard' && 'Leaderboard'}
                 </span>
                 <button
@@ -511,14 +509,7 @@ const HorseBettingApp = () => {
                     <Activity className="w-5 h-5" />
                     Races
                   </button>
-                  <button 
-                    onClick={() => handleTabChange('bets')} 
-                    className={`w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-indigo-50 transition-colors ${activeTab === 'bets' ? 'bg-indigo-100 text-indigo-700' : 'text-gray-700'}`}
-                  >
-                    <Star className="w-5 h-5" />
-                    Your Bets
-                  </button>
-                  <button 
+                  <button
                     onClick={() => handleTabChange('leaderboard')} 
                     className={`w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-indigo-50 transition-colors ${activeTab === 'leaderboard' ? 'bg-indigo-100 text-indigo-700' : 'text-gray-700'}`}
                   >
@@ -539,10 +530,6 @@ const HorseBettingApp = () => {
                 <button onClick={() => handleTabChange('races')} className={`py-3 px-6 rounded-md transition-colors duration-200 font-semibold ${activeTab === 'races' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-600 hover:text-indigo-700'}`}>
                   <Activity className="inline-block w-5 h-5 mr-2" />
                   Races
-                </button>
-                <button onClick={() => handleTabChange('bets')} className={`py-3 px-6 rounded-md transition-colors duration-200 font-semibold ${activeTab === 'bets' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-600 hover:text-indigo-700'}`}>
-                  <Star className="inline-block w-5 h-5 mr-2" />
-                  Your Bets
                 </button>
                 <button onClick={() => handleTabChange('leaderboard')} className={`py-3 px-6 rounded-md transition-colors duration-200 font-semibold ${activeTab === 'leaderboard' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-600 hover:text-indigo-700'}`}>
                   <Trophy className="inline-block w-5 h-5 mr-2" />
@@ -565,20 +552,10 @@ const HorseBettingApp = () => {
                 fetchRaceDayData={fetchRaceDayData}
                 loading={loading}
                 isAdmin={isAdminAuthenticated}
-              />
-            )}
-
-            {activeTab === 'bets' && (
-              <UserBetsTab
-                races={races}
                 bets={bets}
                 bankers={bankers}
                 users={users}
                 selectedUserId={selectedUserId}
-                handleUserSelect={handleUserSelect}
-                availableRaceDays={availableRaceDays}
-                selectedRaceDay={selectedRaceDay}
-                fetchRaceDayData={fetchRaceDayData}
                 handleSetBet={handleSetBet}
                 handleSetBanker={handleSetBanker}
               />
