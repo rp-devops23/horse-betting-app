@@ -109,6 +109,27 @@ def _find_horse_container(horse_link_tag) -> BeautifulSoup:
 
 
 # ---------------------------------------------------------------------------
+# Time helpers
+# ---------------------------------------------------------------------------
+
+def _to_24h(time_str: str) -> str:
+    """Normalise a supertote time string to HH:MM 24-hour format.
+
+    Supertote omits the leading '1' for afternoon hours, e.g. '1:10' means
+    13:10 and '4:55' means 16:55.  Mauritius racing runs ~12:00–17:00, so
+    any hour in the range 1–9 is treated as 13–21 (i.e. add 12).
+    Hours already >= 10 are left as-is.
+    """
+    try:
+        h, m = map(int, time_str.split(":"))
+        if 1 <= h <= 9:
+            h += 12
+        return f"{h:02d}:{m:02d}"
+    except (ValueError, AttributeError):
+        return time_str
+
+
+# ---------------------------------------------------------------------------
 # Race-page scraper
 # ---------------------------------------------------------------------------
 
@@ -140,7 +161,7 @@ def _scrape_race_page(
         text = h.get_text(" ", strip=True)
         m = re.search(r"Race\s+\d+\s*[:\-]\s*(\d{1,2}[.:]\d{2})", text, re.IGNORECASE)
         if m:
-            race_time = m.group(1).replace(".", ":")
+            race_time = _to_24h(m.group(1).replace(".", ":"))
             break
 
     # Separate heading that holds the race title (no "Race N" in it)
