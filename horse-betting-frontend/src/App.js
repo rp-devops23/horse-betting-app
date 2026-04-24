@@ -385,9 +385,10 @@ const HorseBettingApp = () => {
       await fetchAllData();
       setSelectedUserId(data.id);
       setShowRegisterForm(false);
+      setUserPickerOpen(false);
       setRegisterName('');
       setRegisterPin('');
-      showMessage(`Welcome, ${data.name}!`, 'success');
+      showMessage(`Bienvenue, ${data.name} !`, 'success');
     } catch (e) {
       showMessage(`Error: ${e.message}`, 'error');
     }
@@ -398,6 +399,7 @@ const HorseBettingApp = () => {
     const handler = (e) => {
       if (userPickerRef.current && !userPickerRef.current.contains(e.target)) {
         setUserPickerOpen(false);
+        setShowRegisterForm(false);
       }
     };
     document.addEventListener('mousedown', handler);

@@ -9,7 +9,7 @@ const LeaderboardTab = ({ users, showMessage }) => {
 
   // Helper to get user name from user ID
   const getUserName = (userId) => {
-    const user = users.find(u => u.id === userId);
+    const user = users.find(u => String(u.id) === String(userId));
     return user ? user.name : `User ${userId}`;
   };
 
