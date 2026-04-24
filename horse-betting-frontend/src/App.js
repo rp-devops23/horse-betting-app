@@ -500,14 +500,15 @@ const HorseBettingApp = () => {
             )}
 
             {activeTab === 'races' && (
-              <RaceDayTab 
-                races={races} 
-                currentRaceDay={currentRaceDay} 
+              <RaceDayTab
+                races={races}
+                currentRaceDay={currentRaceDay}
                 availableRaceDays={availableRaceDays}
                 selectedRaceDay={selectedRaceDay}
-                fetchAllData={fetchAllData} 
+                fetchAllData={fetchAllData}
                 fetchRaceDayData={fetchRaceDayData}
-                loading={loading} 
+                loading={loading}
+                isAdmin={isAdminAuthenticated}
               />
             )}
 

@@ -9,7 +9,7 @@ const SkeletonCard = () => (
   </div>
 );
 
-const RaceDayTab = ({ races, currentRaceDay, availableRaceDays, selectedRaceDay, fetchAllData, fetchRaceDayData, loading }) => {
+const RaceDayTab = ({ races, currentRaceDay, availableRaceDays, selectedRaceDay, fetchAllData, fetchRaceDayData, loading, isAdmin }) => {
   const [editingRaceWinner, setEditingRaceWinner] = useState(null);
   const [raceDayScores, setRaceDayScores] = useState([]);
   const [loadingScores, setLoadingScores] = useState(false);
@@ -212,14 +212,16 @@ const RaceDayTab = ({ races, currentRaceDay, availableRaceDays, selectedRaceDay,
                   {race.time && (
                     <span className="text-sm text-gray-600 bg-white px-2 py-1 rounded">{race.time}</span>
                   )}
-                  {/* Edit winner button */}
-                  <button
-                    onClick={() => setEditingRaceWinner(editingRaceWinner === race.id ? null : race.id)}
-                    className="p-1 text-gray-400 hover:text-indigo-600 transition-colors"
-                    title="Set race winner"
-                  >
-                    <Edit3 className="w-4 h-4" />
-                  </button>
+                  {/* Edit winner button — admin only */}
+                  {isAdmin && (
+                    <button
+                      onClick={() => setEditingRaceWinner(editingRaceWinner === race.id ? null : race.id)}
+                      className="p-1 text-gray-400 hover:text-indigo-600 transition-colors"
+                      title="Set race winner"
+                    >
+                      <Edit3 className="w-4 h-4" />
+                    </button>
+                  )}
                   <span className={`text-sm font-semibold px-2 py-1 rounded-full ${
                     race.status === 'completed' ? 'bg-green-200 text-green-800' : 
                     race.status === 'in_progress' ? 'bg-blue-200 text-blue-800' :
