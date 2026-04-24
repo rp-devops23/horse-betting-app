@@ -91,6 +91,18 @@ def get_file_tree():
     """
     return jsonify({"error": "File tree not available when using a database."}), 400
 
+@admin_bp.route('/users/toggle-admin', methods=['POST'])
+def toggle_user_admin():
+    """Grants or revokes admin flag for a user."""
+    data = request.get_json(force=True)
+    user_id = data.get('userId')
+    is_admin = bool(data.get('isAdmin', False))
+    if not user_id:
+        return jsonify({"error": "userId is required"}), 400
+    if data_service.set_user_admin(user_id, is_admin):
+        return jsonify({"success": True})
+    return jsonify({"error": "User not found"}), 404
+
 @admin_bp.route('/settings', methods=['GET'])
 def get_settings():
     """Returns the current scoring configuration."""

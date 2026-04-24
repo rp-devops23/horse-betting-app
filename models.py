@@ -11,6 +11,7 @@ class User(db.Model):
     id = db.Column(db.String, primary_key=True)
     name = db.Column(db.String, nullable=False)
     pin = db.Column(db.String(4), nullable=True)
+    is_admin = db.Column(db.Boolean, default=False)
 
     # Relationships
     bets = db.relationship('Bet', backref='user', lazy=True, cascade='all, delete-orphan')

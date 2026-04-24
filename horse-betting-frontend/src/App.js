@@ -353,6 +353,7 @@ const HorseBettingApp = () => {
       const data = await response.json();
       if (data.success) {
         setSelectedUserId(pendingUserId);
+        if (data.is_admin) setIsAdminAuthenticated(true);
         setShowPinModal(false);
         setPinInput('');
         setPendingUserId(null);
@@ -367,7 +368,9 @@ const HorseBettingApp = () => {
 
   const handleUserLogout = useCallback(() => {
     setSelectedUserId(null);
-  }, []);
+    setIsAdminAuthenticated(false);
+    if (activeTab === 'admin') setActiveTab('home');
+  }, [activeTab]);
 
   const handleRegister = useCallback(async () => {
     if (!registerName.trim()) { showMessage('Please enter your name.', 'info'); return; }
@@ -423,6 +426,7 @@ const HorseBettingApp = () => {
             { id: 'home', label: 'Accueil', Icon: Home },
             { id: 'races', label: 'Courses', Icon: Calendar },
             { id: 'leaderboard', label: 'Classement', Icon: Trophy },
+            ...(isAdminAuthenticated ? [{ id: 'admin', label: 'Admin', Icon: Settings }] : []),
           ].map(({ id, label, Icon }) => (
             <button
               key={id}
@@ -440,17 +444,14 @@ const HorseBettingApp = () => {
       </nav>
       <div className="container mx-auto p-4 sm:p-8 pb-24 lg:pb-8">
         <div className="relative flex items-center justify-center mb-4">
-          <h1 className="text-4xl font-extrabold text-center text-indigo-800 tracking-tight">Payen family's Lekours</h1>
-          <div className="absolute right-0 flex items-center gap-2">
-            <span className="hidden sm:inline text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-300">β beta</span>
-            <button
-              onClick={handleAdminTabClick}
-              className="p-2 text-gray-400 hover:text-indigo-600 transition-colors"
-              title="Admin"
-            >
-              <Settings className="w-5 h-5" />
-            </button>
-          </div>
+          <h1
+            className="text-4xl font-extrabold text-center text-indigo-800 tracking-tight select-none"
+            onDoubleClick={handleAdminTabClick}
+            title=""
+          >
+            Payen family's Lekours
+          </h1>
+          <span className="absolute right-0 text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-300">β</span>
         </div>
 
         {/* User selector bar */}
@@ -549,6 +550,12 @@ const HorseBettingApp = () => {
                   <Trophy className="inline-block w-5 h-5 mr-2" />
                   Classement
                 </button>
+                {isAdminAuthenticated && (
+                  <button onClick={() => handleTabChange('admin')} className={`py-3 px-6 rounded-md transition-colors duration-200 font-semibold ${activeTab === 'admin' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-600 hover:text-indigo-700'}`}>
+                    <Settings className="inline-block w-5 h-5 mr-2" />
+                    Admin
+                  </button>
+                )}
               </div>
             </div>
 

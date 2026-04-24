@@ -327,8 +327,8 @@ const RaceDayTab = ({
                               : 'bg-white border border-gray-100'
                           }`}
                         >
-                          {/* Left: number + name + badges */}
-                          <div className="flex items-center gap-3 min-w-0">
+                          {/* Left: number circle + name/badges column */}
+                          <div className="flex items-center gap-3 min-w-0 flex-1">
                             <span className={`flex-shrink-0 font-bold w-8 h-8 rounded-full flex items-center justify-center text-sm ${
                               isScratched ? 'bg-gray-200 text-gray-400' :
                               wonBet ? 'bg-white text-green-600' :
@@ -339,40 +339,45 @@ const RaceDayTab = ({
                             }`}>
                               {horse.number}
                             </span>
-                            <span className={`font-medium truncate ${
-                              isScratched ? 'line-through text-gray-400' :
-                              wonBet || isMyBet ? 'text-white' :
-                              isWinner ? 'text-yellow-900' :
-                              isLastHorse ? 'text-red-700' : 'text-gray-800'
-                            }`}>
-                              {horse.name}
-                            </span>
-                            {isScratched && <AlertCircle className="w-4 h-4 flex-shrink-0 text-gray-400" title="Non-partant" />}
-                            {wonBet && <Trophy className="w-4 h-4 flex-shrink-0" />}
-                            {isWinner && !isMyBet && <Trophy className="w-4 h-4 flex-shrink-0 text-yellow-600" />}
-                            {isLastHorse && !isScratched && <Flag className="w-3.5 h-3.5 flex-shrink-0 text-red-500" title="Dernier" />}
+                            <div className="min-w-0">
+                              {/* Name row */}
+                              <div className="flex items-center gap-1.5">
+                                <span className={`font-medium truncate ${
+                                  isScratched ? 'line-through text-gray-400' :
+                                  wonBet || isMyBet ? 'text-white' :
+                                  isWinner ? 'text-yellow-900' :
+                                  isLastHorse ? 'text-red-700' : 'text-gray-800'
+                                }`}>
+                                  {horse.name}
+                                </span>
+                                {isScratched && <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 text-gray-400" title="Non-partant" />}
+                                {wonBet && <Trophy className="w-3.5 h-3.5 flex-shrink-0" />}
+                                {isWinner && !isMyBet && <Trophy className="w-3.5 h-3.5 flex-shrink-0 text-yellow-600" />}
+                                {isLastHorse && !isScratched && <Flag className="w-3 h-3 flex-shrink-0 text-red-500" title="Dernier" />}
+                              </div>
+                              {/* Pickers row — below the name */}
+                              {pickers.length > 0 && (
+                                <div className="flex flex-wrap gap-1 mt-1">
+                                  {pickers.map(u => {
+                                    const colour = getUserColour(users, u.id);
+                                    const isMe = String(u.id) === String(selectedUserId);
+                                    return (
+                                      <span
+                                        key={u.id}
+                                        title={u.name}
+                                        className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white ${colour} ${isMe ? 'ring-2 ring-white ring-offset-1' : ''}`}
+                                      >
+                                        {initials(u.name)}
+                                      </span>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
                           </div>
 
-                        {/* Right: picker badges + odds */}
+                        {/* Right: odds only */}
                         <div className="flex items-center gap-2 ml-2 flex-shrink-0">
-                          {/* User pick initials */}
-                          {pickers.length > 0 && (
-                            <div className="flex gap-1">
-                              {pickers.map(u => {
-                                  const colour = getUserColour(users, u.id);
-                                const isMe = String(u.id) === String(selectedUserId);
-                                return (
-                                  <span
-                                    key={u.id}
-                                    title={u.name}
-                                    className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white ${colour} ${isMe ? 'ring-2 ring-white ring-offset-1' : ''}`}
-                                  >
-                                    {initials(u.name)}
-                                  </span>
-                                );
-                              })}
-                            </div>
-                          )}
                           {isAdmin && editingOdds?.raceId === race.id && editingOdds?.horseNumber === horse.number ? (
                             <span className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
                               <input

@@ -48,7 +48,7 @@ class DataService:
     def get_all_users(self) -> List[Dict[str, Any]]:
         """Get all users from the database."""
         users = User.query.all()
-        return [{"id": user.id, "name": user.name} for user in users]
+        return [{"id": user.id, "name": user.name, "is_admin": bool(user.is_admin)} for user in users]
 
     def add_user(self, name: str, pin: str = None) -> Dict[str, Any]:
         """Add a new user to the database."""
@@ -58,12 +58,26 @@ class DataService:
         db.session.commit()
         return {"id": user_id, "name": name}
 
-    def verify_user_pin(self, user_id: str, pin: str) -> bool:
-        """Verify a user's PIN."""
+    def verify_user_pin(self, user_id: str, pin: str):
+        """Verify a user's PIN. Returns dict with is_admin on success, False on failure."""
         user = User.query.get(user_id)
-        if user and user.pin:
-            return user.pin == pin
+        if user and user.pin and user.pin == pin:
+            return {"success": True, "is_admin": bool(user.is_admin)}
         return False
+
+    def set_user_admin(self, user_id: str, is_admin: bool) -> bool:
+        """Set or unset admin flag for a user."""
+        try:
+            user = User.query.get(user_id)
+            if user:
+                user.is_admin = is_admin
+                db.session.commit()
+                return True
+            return False
+        except Exception as e:
+            logger.error(f"Error setting admin flag: {e}")
+            db.session.rollback()
+            return False
 
     def delete_user(self, user_id: str) -> bool:
         """Deletes a user and all their associated data."""

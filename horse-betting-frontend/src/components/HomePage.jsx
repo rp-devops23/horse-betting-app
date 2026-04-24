@@ -1,7 +1,29 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Trophy, Shield, Users, Info, Award, Target, Heart } from 'lucide-react';
+import API_BASE from '../config';
+
+const TIER_COLOURS = [
+  'bg-purple-100 text-purple-800',
+  'bg-blue-100 text-blue-800',
+  'bg-green-100 text-green-800',
+  'bg-teal-100 text-teal-800',
+  'bg-gray-100 text-gray-600',
+];
 
 const HomePage = () => {
+  const [scoringConfig, setScoringConfig] = useState(null);
+
+  useEffect(() => {
+    fetch(`${API_BASE}/admin/settings`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data) setScoringConfig(data); })
+      .catch(() => {});
+  }, []);
+
+  const sortedTiers = scoringConfig
+    ? [...scoringConfig.tiers].sort((a, b) => b.min_odds - a.min_odds)
+    : null;
+
   return (
     <div className="bg-white p-6 rounded-b-lg shadow-lg">
       <div className="space-y-6 max-w-2xl mx-auto">
@@ -73,22 +95,37 @@ const HomePage = () => {
             Système de points
           </h2>
           <div className="space-y-3 text-gray-700">
-            <div className="flex items-center justify-between">
-              <span className="font-medium">Pari gagnant (cote ≥ 10)</span>
-              <span className="bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-sm font-semibold">+3 pts</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="font-medium">Pari gagnant (cote 5–9.99)</span>
-              <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-semibold">+2 pts</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="font-medium">Pari gagnant (cote &lt; 5)</span>
-              <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-semibold">+1 pt</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="font-medium">Pari perdant</span>
-              <span className="bg-gray-100 text-gray-600 px-3 py-1 rounded-full text-sm font-semibold">0 pt</span>
-            </div>
+            {sortedTiers ? (
+              <>
+                {sortedTiers.map((tier, i) => {
+                  const next = sortedTiers[i + 1];
+                  const label = i === 0
+                    ? `Pari gagnant (cote ≥ ${tier.min_odds})`
+                    : next
+                    ? `Pari gagnant (cote ${tier.min_odds}–${next.min_odds - 0.01})`
+                    : `Pari gagnant (cote < ${sortedTiers[i - 1]?.min_odds ?? tier.min_odds})`;
+                  const colour = TIER_COLOURS[i % TIER_COLOURS.length];
+                  return (
+                    <div key={i} className="flex items-center justify-between">
+                      <span className="font-medium">{label}</span>
+                      <span className={`${colour} px-3 py-1 rounded-full text-sm font-semibold`}>+{tier.points} pt{tier.points > 1 ? 's' : ''}</span>
+                    </div>
+                  );
+                })}
+                <div className="flex items-center justify-between">
+                  <span className="font-medium">Pari perdant</span>
+                  <span className="bg-gray-100 text-gray-600 px-3 py-1 rounded-full text-sm font-semibold">0 pt</span>
+                </div>
+                {scoringConfig.last_place_penalty !== 0 && (
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium">Cheval arrivé dernier</span>
+                    <span className="bg-red-100 text-red-700 px-3 py-1 rounded-full text-sm font-semibold">{scoringConfig.last_place_penalty} pt</span>
+                  </div>
+                )}
+              </>
+            ) : (
+              <p className="text-sm text-gray-400 italic">Chargement…</p>
+            )}
           </div>
           <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
             <p className="text-sm text-gray-700">

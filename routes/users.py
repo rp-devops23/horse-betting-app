@@ -33,8 +33,9 @@ def login_user():
     pin = request.json.get('pin')
     if not user_id or not pin:
         return jsonify({"error": "userId and pin are required"}), 400
-    if data_service.verify_user_pin(user_id, str(pin)):
-        return jsonify({"success": True}), 200
+    result = data_service.verify_user_pin(user_id, str(pin))
+    if result:
+        return jsonify(result), 200
     return jsonify({"success": False, "error": "Invalid PIN"}), 401
     
 @users_bp.route('/users/<user_id>', methods=['DELETE'])

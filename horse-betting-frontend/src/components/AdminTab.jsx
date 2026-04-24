@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Settings, Users, Plus, Calendar, Edit2, Trash2, Check, X, LogOut, Download, Upload, Eye, EyeOff, Sliders } from 'lucide-react';
+import { Settings, Users, Plus, Calendar, Edit2, Trash2, Check, X, LogOut, Download, Upload, Eye, EyeOff, Sliders, ShieldCheck } from 'lucide-react';
 import API_BASE from '../config';
 import { BADGE_COLOURS, initials } from '../utils/userColors';
 
@@ -111,6 +111,19 @@ const AdminTab = ({
   const toggleShowPin = (userId) =>
     setShowPins(prev => ({ ...prev, [userId]: !prev[userId] }));
 
+  const handleToggleAdmin = async (userId, currentIsAdmin) => {
+    try {
+      const res = await fetch(`${API_BASE}/admin/users/toggle-admin`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, isAdmin: !currentIsAdmin }),
+      });
+      if (res.ok) showMessage(!currentIsAdmin ? 'Accès admin accordé.' : 'Accès admin retiré.', 'success');
+    } catch (e) {
+      showMessage(`Erreur : ${e.message}`, 'error');
+    }
+  };
+
   const handleDownloadBackup = () => window.open(`${API_BASE}/admin/backup`, '_blank');
 
   const handleRestoreBackup = async (e) => {
@@ -174,10 +187,10 @@ const AdminTab = ({
         </h3>
 
         {/* Add user */}
-        <div className="flex items-center gap-2">
+        <div className="flex gap-2">
           <input
             type="text"
-            className="flex-1 p-2 border rounded-md text-sm"
+            className="flex-1 min-w-0 p-2 border rounded-md text-sm"
             placeholder="Prénom"
             value={newUserName}
             onChange={(e) => setNewUserName(e.target.value)}
@@ -186,12 +199,12 @@ const AdminTab = ({
             type="password"
             inputMode="numeric"
             maxLength={4}
-            className="w-20 p-2 border rounded-md text-center tracking-widest text-sm"
+            className="w-16 p-2 border rounded-md text-center tracking-widest text-sm flex-shrink-0"
             placeholder="PIN"
             value={newUserPin}
             onChange={(e) => setNewUserPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
           />
-          <button onClick={handleAddUser} className="bg-green-500 text-white p-2 rounded-md hover:bg-green-600 transition-colors">
+          <button onClick={handleAddUser} className="bg-green-500 text-white p-2 rounded-md hover:bg-green-600 transition-colors flex-shrink-0">
             <Plus className="w-5 h-5" />
           </button>
         </div>
@@ -236,22 +249,26 @@ const AdminTab = ({
                       </button>
                     </div>
                   ) : (
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5 flex-wrap">
                       <span className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white ${colour}`}>
                         {initials(user.name)}
                       </span>
-                      <span className="flex-1 text-sm font-medium">{user.name}</span>
+                      <span className="flex-1 min-w-0 text-sm font-medium truncate">{user.name}</span>
+                      {user.is_admin && <ShieldCheck className="w-4 h-4 text-indigo-500 flex-shrink-0" title="Admin" />}
                       {/* PIN display */}
-                      <span className="text-sm font-mono text-gray-500 w-12 text-center">
+                      <span className="text-sm font-mono text-gray-500 w-10 text-center flex-shrink-0">
                         {pinVisible ? pin : '••••'}
                       </span>
-                      <button onClick={() => toggleShowPin(user.id)} className="p-1 text-gray-400 hover:text-gray-700 rounded" title={pinVisible ? 'Masquer PIN' : 'Voir PIN'}>
+                      <button onClick={() => toggleShowPin(user.id)} className="p-1 text-gray-400 hover:text-gray-700 rounded flex-shrink-0" title={pinVisible ? 'Masquer PIN' : 'Voir PIN'}>
                         {pinVisible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </button>
-                      <button onClick={() => handleStartEdit(user)} className="p-1 text-blue-600 hover:bg-blue-100 rounded" title="Modifier">
+                      <button onClick={() => handleToggleAdmin(user.id, user.is_admin)} className={`p-1 rounded flex-shrink-0 ${user.is_admin ? 'text-indigo-500 hover:bg-indigo-50' : 'text-gray-300 hover:text-indigo-400'}`} title={user.is_admin ? 'Retirer accès admin' : 'Donner accès admin'}>
+                        <ShieldCheck className="w-4 h-4" />
+                      </button>
+                      <button onClick={() => handleStartEdit(user)} className="p-1 text-blue-600 hover:bg-blue-100 rounded flex-shrink-0" title="Modifier">
                         <Edit2 className="w-4 h-4" />
                       </button>
-                      <button onClick={() => handleDeleteUser(user.id)} className="p-1 text-red-600 hover:bg-red-100 rounded" title="Supprimer">
+                      <button onClick={() => handleDeleteUser(user.id)} className="p-1 text-red-600 hover:bg-red-100 rounded flex-shrink-0" title="Supprimer">
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
@@ -274,7 +291,7 @@ const AdminTab = ({
           Journées de courses
         </h3>
         <button onClick={handleScrapeRaces} className="w-full bg-indigo-500 text-white p-2 rounded-md hover:bg-indigo-600 transition-colors text-sm">
-          Scraper les nouvelles courses
+          Importer / Mettre à jour les courses
         </button>
       </div>
 
@@ -289,33 +306,33 @@ const AdminTab = ({
 
           {/* Tiers */}
           <div className="space-y-2">
-            <div className="grid grid-cols-[1fr_1fr_auto] gap-2 text-xs font-semibold text-gray-500 px-1">
-              <span>Cote minimale (≥)</span>
-              <span>Points</span>
-              <span></span>
+            <div className="flex gap-2 text-xs font-semibold text-gray-500 px-1">
+              <span className="flex-1 text-center">Cote ≥</span>
+              <span className="flex-1 text-center">Points</span>
+              <span className="w-8"></span>
             </div>
             {[...scoringConfig.tiers]
               .sort((a, b) => b.min_odds - a.min_odds)
               .map((tier, i) => {
                 const realIndex = scoringConfig.tiers.findIndex(t => t === tier);
                 return (
-                  <div key={i} className="grid grid-cols-[1fr_1fr_auto] gap-2 items-center bg-white p-2 rounded border">
+                  <div key={i} className="flex gap-2 items-center bg-white p-2 rounded border">
                     <input
                       type="number"
                       step="1"
                       min="0"
                       value={tier.min_odds}
                       onChange={e => updateTier(realIndex, 'min_odds', e.target.value)}
-                      className="p-1 border border-gray-300 rounded text-sm text-center"
+                      className="flex-1 min-w-0 p-1 border border-gray-300 rounded text-sm text-center"
                     />
                     <input
                       type="number"
                       step="1"
                       value={tier.points}
                       onChange={e => updateTier(realIndex, 'points', e.target.value)}
-                      className="p-1 border border-gray-300 rounded text-sm text-center"
+                      className="flex-1 min-w-0 p-1 border border-gray-300 rounded text-sm text-center"
                     />
-                    <button onClick={() => removeTier(realIndex)} className="p-1 text-red-400 hover:text-red-600 rounded hover:bg-red-50">
+                    <button onClick={() => removeTier(realIndex)} className="flex-shrink-0 p-1 text-red-400 hover:text-red-600 rounded hover:bg-red-50">
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
