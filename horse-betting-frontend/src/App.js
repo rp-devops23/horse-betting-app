@@ -572,7 +572,7 @@ const HorseBettingApp = () => {
             </div>
 
             {activeTab === 'home' && (
-              <HomePage users={users} showMessage={showMessage} />
+              <HomePage />
             )}
 
             {activeTab === 'races' && (
