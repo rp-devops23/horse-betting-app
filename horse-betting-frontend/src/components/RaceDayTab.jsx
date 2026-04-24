@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, ChevronDown, Trophy, Edit3, X, Star } from 'lucide-react';
 import API_BASE from '../config';
-import { BADGE_COLOURS, initials, getUserColour } from '../utils/userColors';
+import { initials, getUserColour } from '../utils/userColors';
 
 const SkeletonCard = () => (
   <div className="bg-white p-4 rounded-lg shadow animate-pulse">
