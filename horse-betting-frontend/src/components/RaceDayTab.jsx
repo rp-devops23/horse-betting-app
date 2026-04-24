@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, ChevronDown, Trophy, Edit3, X, Star } from 'lucide-react';
+import { Calendar, ChevronDown, Trophy, Edit3, X, Star, Check, AlertCircle, Flag } from 'lucide-react';
 import API_BASE from '../config';
 import { initials, getUserColour } from '../utils/userColors';
 
@@ -17,6 +17,8 @@ const RaceDayTab = ({
   handleSetBet, handleSetBanker,
 }) => {
   const [editingRaceWinner, setEditingRaceWinner] = useState(null);
+  const [editingLastHorse, setEditingLastHorse] = useState(null);
+  const [editingOdds, setEditingOdds] = useState(null); // { raceId, horseNumber, value }
   const [raceDayScores, setRaceDayScores] = useState([]);
   const [loadingScores, setLoadingScores] = useState(false);
 
@@ -33,6 +35,53 @@ const RaceDayTab = ({
       }
     } catch (e) {
       console.error('Error setting winner:', e);
+    }
+  };
+
+  const handleSaveOdds = async () => {
+    if (!editingOdds) return;
+    const { raceId, horseNumber, value } = editingOdds;
+    const parsed = parseFloat(value);
+    if (!parsed || parsed <= 0) { setEditingOdds(null); return; }
+    try {
+      await fetch(`${API_BASE}/races/${raceId}/horses/${horseNumber}/odds`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ odds: parsed }),
+      });
+      setEditingOdds(null);
+      selectedRaceDay ? fetchRaceDayData(selectedRaceDay) : fetchAllData();
+    } catch (e) {
+      console.error('Error updating odds:', e);
+    }
+  };
+
+  const handleSetLastHorse = async (raceId, horseNumber) => {
+    try {
+      const res = await fetch(`${API_BASE}/races/${raceId}/last`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lastHorseNumber: horseNumber }),
+      });
+      if (res.ok) {
+        setEditingLastHorse(null);
+        selectedRaceDay ? fetchRaceDayData(selectedRaceDay) : fetchAllData();
+      }
+    } catch (e) {
+      console.error('Error setting last horse:', e);
+    }
+  };
+
+  const handleToggleScratch = async (raceId, horseNumber) => {
+    try {
+      const res = await fetch(`${API_BASE}/races/${raceId}/horses/${horseNumber}/scratch`, {
+        method: 'POST',
+      });
+      if (res.ok) {
+        selectedRaceDay ? fetchRaceDayData(selectedRaceDay) : fetchAllData();
+      }
+    } catch (e) {
+      console.error('Error toggling scratch:', e);
     }
   };
 
@@ -164,11 +213,21 @@ const RaceDayTab = ({
                     {/* Admin: set winner */}
                     {isAdmin && (
                       <button
-                        onClick={() => setEditingRaceWinner(editingRaceWinner === race.id ? null : race.id)}
-                        className="p-1 text-gray-400 hover:text-indigo-600 transition-colors"
-                        title="Set race winner"
+                        onClick={() => { setEditingRaceWinner(editingRaceWinner === race.id ? null : race.id); setEditingLastHorse(null); }}
+                        className={`p-1 transition-colors ${editingRaceWinner === race.id ? 'text-indigo-600' : 'text-gray-400 hover:text-indigo-600'}`}
+                        title="Définir le gagnant"
                       >
                         <Edit3 className="w-4 h-4" />
+                      </button>
+                    )}
+                    {/* Admin: set last horse */}
+                    {isAdmin && (
+                      <button
+                        onClick={() => { setEditingLastHorse(editingLastHorse === race.id ? null : race.id); setEditingRaceWinner(null); }}
+                        className={`p-1 transition-colors ${editingLastHorse === race.id ? 'text-red-600' : 'text-gray-400 hover:text-red-500'}`}
+                        title="Définir le dernier"
+                      >
+                        <Flag className="w-4 h-4" />
                       </button>
                     )}
                     <span className={`text-xs font-semibold px-2 py-1 rounded-full ${
@@ -205,57 +264,94 @@ const RaceDayTab = ({
                   </div>
                 )}
 
+                {/* Admin last horse picker */}
+                {editingLastHorse === race.id && (
+                  <div className="mb-3 p-3 bg-red-50 rounded-lg border border-red-200">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-red-800">Choisir le dernier cheval :</span>
+                      <button onClick={() => setEditingLastHorse(null)} className="text-red-400 hover:text-red-700">
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      {race.horses.filter(h => !h.scratched).map(horse => (
+                        <button
+                          key={horse.number}
+                          onClick={() => handleSetLastHorse(race.id, horse.number)}
+                          className={`flex items-center gap-2 px-3 py-2 bg-white border rounded-lg hover:bg-red-50 transition-colors text-left ${race.lastHorse === horse.number ? 'border-red-500 bg-red-50' : 'border-red-200'}`}
+                        >
+                          <span className="font-bold text-red-600">#{horse.number}</span>
+                          <span className="text-sm truncate">{horse.name}</span>
+                          {race.lastHorse === horse.number && <Flag className="w-3 h-3 text-red-500 flex-shrink-0" />}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Horse rows */}
                 <div className="space-y-2">
                   {race.horses.map(horse => {
                     const isMyBet = myBet?.horse === horse.number;
                     const isWinner = race.winner === horse.number;
+                    const isLastHorse = race.lastHorse === horse.number;
                     const wonBet = isMyBet && isWinner;
+                    const isScratched = !!horse.scratched;
+                    const canBetThisHorse = canBet && !isScratched;
 
                     // Who picked this horse?
-                    const pickers = (users || []).filter((u, ui) => {
+                    const pickers = (users || []).filter(u => {
                       const b = bets?.find(bet => String(bet.userId) === String(u.id) && bet.raceId === race.id);
                       return b?.horse === horse.number;
                     });
 
                     return (
-                      <button
-                        key={horse.number}
-                        onClick={() => canBet && handleSetBet(race.id, horse.number)}
-                        disabled={!canBet}
-                        className={`w-full p-3 rounded-lg flex items-center justify-between min-h-[52px] transition-all ${
-                          canBet ? 'cursor-pointer' : 'cursor-default'
-                        } ${
-                          wonBet
-                            ? 'bg-gradient-to-r from-green-500 to-green-600 text-white shadow-md border-2 border-green-400'
-                            : isWinner
-                            ? 'bg-gradient-to-r from-yellow-100 to-yellow-50 border-2 border-yellow-300'
-                            : isMyBet
-                            ? 'bg-indigo-600 text-white shadow-md'
-                            : canBet
-                            ? 'bg-white hover:bg-indigo-50 border border-gray-200 hover:border-indigo-300'
-                            : 'bg-white border border-gray-100'
-                        }`}
-                      >
-                        {/* Left: number + name + winner badge */}
-                        <div className="flex items-center gap-3 min-w-0">
-                          <span className={`flex-shrink-0 font-bold w-8 h-8 rounded-full flex items-center justify-center text-sm ${
-                            wonBet ? 'bg-white text-green-600' :
-                            isWinner ? 'bg-yellow-400 text-yellow-900' :
-                            isMyBet ? 'bg-white text-indigo-600' :
-                            'bg-indigo-100 text-indigo-600'
-                          }`}>
-                            {horse.number}
-                          </span>
-                          <span className={`font-medium truncate ${
-                            wonBet || isMyBet ? 'text-white' :
-                            isWinner ? 'text-yellow-900' : 'text-gray-800'
-                          }`}>
-                            {horse.name}
-                          </span>
-                          {wonBet && <Trophy className="w-4 h-4 flex-shrink-0" />}
-                          {isWinner && !isMyBet && <Trophy className="w-4 h-4 flex-shrink-0 text-yellow-600" />}
-                        </div>
+                      <div key={horse.number} className="relative">
+                        <button
+                          onClick={() => canBetThisHorse && handleSetBet(race.id, horse.number)}
+                          disabled={!canBetThisHorse}
+                          className={`w-full p-3 rounded-lg flex items-center justify-between min-h-[52px] transition-all ${
+                            isScratched ? 'opacity-50 cursor-not-allowed bg-gray-100 border border-dashed border-gray-300' :
+                            canBet ? 'cursor-pointer' : 'cursor-default'
+                          } ${isScratched ? '' :
+                            wonBet
+                              ? 'bg-gradient-to-r from-green-500 to-green-600 text-white shadow-md border-2 border-green-400'
+                              : isWinner
+                              ? 'bg-gradient-to-r from-yellow-100 to-yellow-50 border-2 border-yellow-300'
+                              : isLastHorse
+                              ? 'bg-red-50 border border-red-200'
+                              : isMyBet
+                              ? 'bg-indigo-600 text-white shadow-md'
+                              : canBet
+                              ? 'bg-white hover:bg-indigo-50 border border-gray-200 hover:border-indigo-300'
+                              : 'bg-white border border-gray-100'
+                          }`}
+                        >
+                          {/* Left: number + name + badges */}
+                          <div className="flex items-center gap-3 min-w-0">
+                            <span className={`flex-shrink-0 font-bold w-8 h-8 rounded-full flex items-center justify-center text-sm ${
+                              isScratched ? 'bg-gray-200 text-gray-400' :
+                              wonBet ? 'bg-white text-green-600' :
+                              isWinner ? 'bg-yellow-400 text-yellow-900' :
+                              isLastHorse ? 'bg-red-200 text-red-700' :
+                              isMyBet ? 'bg-white text-indigo-600' :
+                              'bg-indigo-100 text-indigo-600'
+                            }`}>
+                              {horse.number}
+                            </span>
+                            <span className={`font-medium truncate ${
+                              isScratched ? 'line-through text-gray-400' :
+                              wonBet || isMyBet ? 'text-white' :
+                              isWinner ? 'text-yellow-900' :
+                              isLastHorse ? 'text-red-700' : 'text-gray-800'
+                            }`}>
+                              {horse.name}
+                            </span>
+                            {isScratched && <AlertCircle className="w-4 h-4 flex-shrink-0 text-gray-400" title="Non-partant" />}
+                            {wonBet && <Trophy className="w-4 h-4 flex-shrink-0" />}
+                            {isWinner && !isMyBet && <Trophy className="w-4 h-4 flex-shrink-0 text-yellow-600" />}
+                            {isLastHorse && !isScratched && <Flag className="w-3.5 h-3.5 flex-shrink-0 text-red-500" title="Dernier" />}
+                          </div>
 
                         {/* Right: picker badges + odds */}
                         <div className="flex items-center gap-2 ml-2 flex-shrink-0">
@@ -277,18 +373,54 @@ const RaceDayTab = ({
                               })}
                             </div>
                           )}
-                          {horse.odds && (
-                            <span className={`text-sm px-2 py-0.5 rounded ${
-                              wonBet ? 'bg-white text-green-600' :
-                              isWinner ? 'bg-yellow-200 text-yellow-800' :
-                              isMyBet ? 'bg-indigo-500 text-white' :
-                              'bg-gray-100 text-gray-600'
-                            }`}>
-                              {horse.odds}
+                          {isAdmin && editingOdds?.raceId === race.id && editingOdds?.horseNumber === horse.number ? (
+                            <span className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                              <input
+                                type="number"
+                                step="0.1"
+                                min="0.1"
+                                value={editingOdds.value}
+                                onChange={e => setEditingOdds(prev => ({ ...prev, value: e.target.value }))}
+                                onKeyDown={e => { if (e.key === 'Enter') handleSaveOdds(); if (e.key === 'Escape') setEditingOdds(null); }}
+                                className="w-16 text-sm px-1 py-0.5 border border-indigo-300 rounded text-gray-800 bg-white"
+                                autoFocus
+                              />
+                              <button onClick={handleSaveOdds} className="p-0.5 text-green-600 hover:bg-green-100 rounded"><Check className="w-3.5 h-3.5" /></button>
+                              <button onClick={() => setEditingOdds(null)} className="p-0.5 text-gray-400 hover:bg-gray-100 rounded"><X className="w-3.5 h-3.5" /></button>
                             </span>
+                          ) : (
+                            horse.odds && (
+                              <span
+                                className={`text-sm px-2 py-0.5 rounded ${
+                                  wonBet ? 'bg-white text-green-600' :
+                                  isWinner ? 'bg-yellow-200 text-yellow-800' :
+                                  isMyBet ? 'bg-indigo-500 text-white' :
+                                  'bg-gray-100 text-gray-600'
+                                } ${isAdmin ? 'cursor-pointer hover:ring-1 hover:ring-indigo-400' : ''}`}
+                                onClick={isAdmin ? (e => { e.stopPropagation(); setEditingOdds({ raceId: race.id, horseNumber: horse.number, value: String(horse.odds) }); }) : undefined}
+                                title={isAdmin ? 'Modifier la cote' : undefined}
+                              >
+                                {horse.odds}
+                              </span>
+                            )
                           )}
                         </div>
-                      </button>
+                        </button>
+                        {/* Admin scratch toggle */}
+                        {isAdmin && race.status !== 'completed' && (
+                          <button
+                            onClick={() => handleToggleScratch(race.id, horse.number)}
+                            className={`absolute top-1 right-1 text-xs px-1.5 py-0.5 rounded transition-colors ${
+                              isScratched
+                                ? 'bg-red-100 text-red-600 hover:bg-red-200'
+                                : 'bg-gray-100 text-gray-400 hover:bg-orange-100 hover:text-orange-600'
+                            }`}
+                            title={isScratched ? 'Rétablir le cheval' : 'Marquer non-partant'}
+                          >
+                            {isScratched ? 'Rétablir' : 'NP'}
+                          </button>
+                        )}
+                      </div>
                     );
                   })}
                 </div>

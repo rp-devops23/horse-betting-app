@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Settings, Users, Plus, Calendar, Edit2, Trash2, Check, X, LogOut, Download, Upload, Eye, EyeOff } from 'lucide-react';
+import { Settings, Users, Plus, Calendar, Edit2, Trash2, Check, X, LogOut, Download, Upload, Eye, EyeOff, Sliders } from 'lucide-react';
 import API_BASE from '../config';
 import { BADGE_COLOURS, initials } from '../utils/userColors';
 
@@ -16,6 +16,10 @@ const AdminTab = ({
   const [restoring, setRestoring] = useState(false);
   const restoreInputRef = useRef(null);
 
+  // Scoring config state
+  const [scoringConfig, setScoringConfig] = useState(null);
+  const [savingScoring, setSavingScoring] = useState(false);
+
   // Fetch users with PINs whenever the users list changes
   useEffect(() => {
     const fetchUsersWithPins = async () => {
@@ -26,6 +30,57 @@ const AdminTab = ({
     };
     fetchUsersWithPins();
   }, [users]);
+
+  // Fetch scoring config once on mount
+  useEffect(() => {
+    const fetchScoringConfig = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/admin/settings`);
+        if (res.ok) setScoringConfig(await res.json());
+      } catch { /* silently ignore */ }
+    };
+    fetchScoringConfig();
+  }, []);
+
+  const handleSaveScoringConfig = async () => {
+    if (!scoringConfig) return;
+    setSavingScoring(true);
+    try {
+      const res = await fetch(`${API_BASE}/admin/settings`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(scoringConfig),
+      });
+      if (res.ok) showMessage('Configuration sauvegardée !', 'success');
+      else showMessage('Erreur lors de la sauvegarde.', 'error');
+    } catch (e) {
+      showMessage(`Erreur : ${e.message}`, 'error');
+    } finally {
+      setSavingScoring(false);
+    }
+  };
+
+  const updateTier = (index, field, value) => {
+    setScoringConfig(prev => {
+      const tiers = [...prev.tiers];
+      tiers[index] = { ...tiers[index], [field]: parseFloat(value) || 0 };
+      return { ...prev, tiers };
+    });
+  };
+
+  const addTier = () => {
+    setScoringConfig(prev => ({
+      ...prev,
+      tiers: [...prev.tiers, { min_odds: 0, points: 1 }],
+    }));
+  };
+
+  const removeTier = (index) => {
+    setScoringConfig(prev => ({
+      ...prev,
+      tiers: prev.tiers.filter((_, i) => i !== index),
+    }));
+  };
 
   const getPinForUser = (userId) =>
     usersWithPins.find(u => String(u.id) === String(userId))?.pin ?? '····';
@@ -222,6 +277,84 @@ const AdminTab = ({
           Scraper les nouvelles courses
         </button>
       </div>
+
+      {/* ── Scoring Config ── */}
+      {scoringConfig && (
+        <div className="bg-gray-100 p-4 rounded-lg space-y-4">
+          <h3 className="font-bold text-lg flex items-center gap-2 text-indigo-600">
+            <Sliders className="w-5 h-5" />
+            Système de points
+          </h3>
+          <p className="text-xs text-gray-500">Points attribués selon la cote du cheval gagnant. Les seuils sont comparés du plus élevé au plus bas.</p>
+
+          {/* Tiers */}
+          <div className="space-y-2">
+            <div className="grid grid-cols-[1fr_1fr_auto] gap-2 text-xs font-semibold text-gray-500 px-1">
+              <span>Cote minimale (≥)</span>
+              <span>Points</span>
+              <span></span>
+            </div>
+            {[...scoringConfig.tiers]
+              .sort((a, b) => b.min_odds - a.min_odds)
+              .map((tier, i) => {
+                const realIndex = scoringConfig.tiers.findIndex(t => t === tier);
+                return (
+                  <div key={i} className="grid grid-cols-[1fr_1fr_auto] gap-2 items-center bg-white p-2 rounded border">
+                    <input
+                      type="number"
+                      step="1"
+                      min="0"
+                      value={tier.min_odds}
+                      onChange={e => updateTier(realIndex, 'min_odds', e.target.value)}
+                      className="p-1 border border-gray-300 rounded text-sm text-center"
+                    />
+                    <input
+                      type="number"
+                      step="1"
+                      value={tier.points}
+                      onChange={e => updateTier(realIndex, 'points', e.target.value)}
+                      className="p-1 border border-gray-300 rounded text-sm text-center"
+                    />
+                    <button onClick={() => removeTier(realIndex)} className="p-1 text-red-400 hover:text-red-600 rounded hover:bg-red-50">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                );
+              })}
+            <button onClick={addTier} className="w-full flex items-center justify-center gap-1 py-1.5 border-2 border-dashed border-gray-300 rounded text-gray-400 hover:border-indigo-400 hover:text-indigo-500 text-sm transition-colors">
+              <Plus className="w-4 h-4" /> Ajouter un seuil
+            </button>
+          </div>
+
+          {/* Last place penalty */}
+          <div className="flex items-center justify-between bg-white p-3 rounded border">
+            <div>
+              <p className="text-sm font-medium">Pénalité dernier</p>
+              <p className="text-xs text-gray-400">Points retirés si le cheval choisi finit dernier</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                step="1"
+                value={scoringConfig.last_place_penalty}
+                onChange={e => setScoringConfig(prev => ({ ...prev, last_place_penalty: parseInt(e.target.value) || 0 }))}
+                className="w-16 p-1 border border-gray-300 rounded text-sm text-center"
+              />
+              <span className="text-sm text-gray-500">pts</span>
+            </div>
+          </div>
+          <p className="text-xs text-gray-400">Valeur 0 = désactivé. Entrer -1 pour retirer 1 point.</p>
+
+          <button
+            onClick={handleSaveScoringConfig}
+            disabled={savingScoring}
+            className="w-full flex items-center justify-center gap-2 bg-indigo-500 text-white p-2 rounded-md hover:bg-indigo-600 transition-colors disabled:opacity-50 text-sm"
+          >
+            <Check className="w-4 h-4" />
+            {savingScoring ? 'Sauvegarde…' : 'Sauvegarder la configuration'}
+          </button>
+        </div>
+      )}
 
       {/* ── Backup & Restore ── */}
       <div className="bg-gray-100 p-4 rounded-lg space-y-4">

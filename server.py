@@ -71,6 +71,21 @@ app = create_app()
 # Create tables on startup (works with both gunicorn and direct execution)
 create_tables(app)
 
+# Apply migrations for new columns (safe — uses IF NOT EXISTS)
+def apply_migrations(app):
+    from database import db
+    from sqlalchemy import text
+    with app.app_context():
+        try:
+            with db.engine.connect() as conn:
+                conn.execute(text("ALTER TABLE races ADD COLUMN IF NOT EXISTS last_horse_number INTEGER"))
+                conn.execute(text("ALTER TABLE horses ADD COLUMN IF NOT EXISTS scratched BOOLEAN DEFAULT FALSE"))
+                conn.commit()
+        except Exception as e:
+            print(f"[Migration] {e}")
+
+apply_migrations(app)
+
 if __name__ == '__main__':
 
     # Get port from environment variable (for Render deployment) or use 5000

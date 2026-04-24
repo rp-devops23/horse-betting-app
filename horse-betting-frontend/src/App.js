@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Trophy, Settings, Activity, Home, Menu, X } from 'lucide-react';
+import { Trophy, Settings, Home, Calendar } from 'lucide-react';
 
 import HomePage from './components/HomePage.jsx';
 import RaceDayTab from './components/RaceDayTab.jsx';
@@ -23,7 +23,6 @@ const HorseBettingApp = () => {
   const [availableRaceDays, setAvailableRaceDays] = useState([]);
   const [selectedRaceDay, setSelectedRaceDay] = useState(null);
   const [selectedUserId, setSelectedUserId] = useState(null); // Start with no user selected
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // User PIN login state
   const [showPinModal, setShowPinModal] = useState(false);
@@ -250,7 +249,6 @@ const HorseBettingApp = () => {
 
   const handleTabChange = useCallback((tabName) => {
     setActiveTab(tabName);
-    setIsMobileMenuOpen(false);
   }, []);
 
   const clearAllUserData = useCallback(async () => {
@@ -409,7 +407,7 @@ const HorseBettingApp = () => {
   const MessageBox = ({ text, type }) => {
     const bgColor = type === 'error' ? 'bg-red-500' : type === 'success' ? 'bg-green-500' : 'bg-blue-500';
     return (
-      <div className={`fixed bottom-4 left-1/2 -translate-x-1/2 ${bgColor} text-white p-4 rounded-lg shadow-xl transition-all duration-300 transform ${showMessageBox ? 'scale-100 opacity-100' : 'scale-90 opacity-0'}`}>
+      <div className={`fixed bottom-20 lg:bottom-4 left-1/2 -translate-x-1/2 z-50 ${bgColor} text-white p-4 rounded-lg shadow-xl transition-all duration-300 transform ${showMessageBox ? 'scale-100 opacity-100' : 'scale-90 opacity-0'}`}>
         {text}
       </div>
     );
@@ -417,16 +415,42 @@ const HorseBettingApp = () => {
 
   return (
     <div className="min-h-screen bg-gray-100 font-sans antialiased text-gray-800">
-      <div className="container mx-auto p-4 sm:p-8">
+      {/* Fixed mobile bottom tab bar */}
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 shadow-lg">
+        <div className="absolute top-1 right-2 text-xs font-semibold text-amber-600 opacity-60">β</div>
+        <div className="flex">
+          {[
+            { id: 'home', label: 'Accueil', Icon: Home },
+            { id: 'races', label: 'Courses', Icon: Calendar },
+            { id: 'leaderboard', label: 'Classement', Icon: Trophy },
+          ].map(({ id, label, Icon }) => (
+            <button
+              key={id}
+              onClick={() => handleTabChange(id)}
+              className={`flex-1 flex flex-col items-center justify-center py-2 gap-0.5 transition-colors ${
+                activeTab === id ? 'text-indigo-600' : 'text-gray-400 hover:text-gray-600'
+              }`}
+            >
+              <Icon className={`w-6 h-6 ${activeTab === id ? 'stroke-[2.5]' : ''}`} />
+              <span className="text-xs font-medium">{label}</span>
+              {activeTab === id && <span className="absolute bottom-0 w-8 h-0.5 bg-indigo-600 rounded-t" />}
+            </button>
+          ))}
+        </div>
+      </nav>
+      <div className="container mx-auto p-4 sm:p-8 pb-24 lg:pb-8">
         <div className="relative flex items-center justify-center mb-4">
           <h1 className="text-4xl font-extrabold text-center text-indigo-800 tracking-tight">Payen family's Lekours</h1>
-          <button
-            onClick={handleAdminTabClick}
-            className="absolute right-0 p-2 text-gray-400 hover:text-indigo-600 transition-colors"
-            title="Admin"
-          >
-            <Settings className="w-5 h-5" />
-          </button>
+          <div className="absolute right-0 flex items-center gap-2">
+            <span className="hidden sm:inline text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-300">β beta</span>
+            <button
+              onClick={handleAdminTabClick}
+              className="p-2 text-gray-400 hover:text-indigo-600 transition-colors"
+              title="Admin"
+            >
+              <Settings className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* User selector bar */}
@@ -509,64 +533,21 @@ const HorseBettingApp = () => {
 
         <div className="flex flex-col lg:flex-row gap-8">
           <div className="flex-1">
-            {/* Mobile Navigation */}
-            <div className="lg:hidden mb-6">
-              <div className="flex items-center justify-between bg-white rounded-lg shadow-md p-4">
-                <span className="text-lg font-semibold text-indigo-700">
-                  {activeTab === 'home' && 'Home'}
-                  {activeTab === 'races' && 'Races'}
-                  {activeTab === 'leaderboard' && 'Leaderboard'}
-                </span>
-                <button
-                  onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                  className="p-2 rounded-lg bg-indigo-100 text-indigo-700 hover:bg-indigo-200 transition-colors"
-                >
-                  {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-                </button>
-              </div>
-              
-              {/* Mobile Dropdown Menu */}
-              {isMobileMenuOpen && (
-                <div className="mt-2 bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden">
-                  <button 
-                    onClick={() => handleTabChange('home')} 
-                    className={`w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-indigo-50 transition-colors ${activeTab === 'home' ? 'bg-indigo-100 text-indigo-700' : 'text-gray-700'}`}
-                  >
-                    <Home className="w-5 h-5" />
-                    Home
-                  </button>
-                  <button 
-                    onClick={() => handleTabChange('races')} 
-                    className={`w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-indigo-50 transition-colors ${activeTab === 'races' ? 'bg-indigo-100 text-indigo-700' : 'text-gray-700'}`}
-                  >
-                    <Activity className="w-5 h-5" />
-                    Races
-                  </button>
-                  <button
-                    onClick={() => handleTabChange('leaderboard')} 
-                    className={`w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-indigo-50 transition-colors ${activeTab === 'leaderboard' ? 'bg-indigo-100 text-indigo-700' : 'text-gray-700'}`}
-                  >
-                    <Trophy className="w-5 h-5" />
-                    Leaderboard
-                  </button>
-                </div>
-              )}
-            </div>
 
-            {/* Desktop Navigation */}
+            {/* Desktop Navigation (hidden on mobile — replaced by bottom bar) */}
             <div className="hidden lg:flex justify-center mb-6">
               <div className="flex bg-gray-100 rounded-lg p-1">
                 <button onClick={() => handleTabChange('home')} className={`py-3 px-6 rounded-md transition-colors duration-200 font-semibold ${activeTab === 'home' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-600 hover:text-indigo-700'}`}>
                   <Home className="inline-block w-5 h-5 mr-2" />
-                  Home
+                  Accueil
                 </button>
                 <button onClick={() => handleTabChange('races')} className={`py-3 px-6 rounded-md transition-colors duration-200 font-semibold ${activeTab === 'races' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-600 hover:text-indigo-700'}`}>
-                  <Activity className="inline-block w-5 h-5 mr-2" />
-                  Races
+                  <Calendar className="inline-block w-5 h-5 mr-2" />
+                  Courses
                 </button>
                 <button onClick={() => handleTabChange('leaderboard')} className={`py-3 px-6 rounded-md transition-colors duration-200 font-semibold ${activeTab === 'leaderboard' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-600 hover:text-indigo-700'}`}>
                   <Trophy className="inline-block w-5 h-5 mr-2" />
-                  Leaderboard
+                  Classement
                 </button>
               </div>
             </div>

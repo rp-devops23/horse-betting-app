@@ -4,6 +4,7 @@ Data service with fixed imports - no more circular dependencies.
 This version imports models and database directly, not from server.py.
 """
 
+import json
 import logging
 import uuid
 import os
@@ -13,7 +14,17 @@ from datetime import datetime
 
 # Import database and models directly (no circular import)
 from database import db
-from models import User, Race, Horse, Bet, UserScore
+from models import User, Race, Horse, Bet, UserScore, AppSetting
+
+DEFAULT_SCORING_CONFIG = {
+    "tiers": [
+        {"min_odds": 20, "points": 5},
+        {"min_odds": 10, "points": 3},
+        {"min_odds": 5, "points": 2},
+        {"min_odds": 0, "points": 1}
+    ],
+    "last_place_penalty": 0
+}
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -111,7 +122,8 @@ class DataService:
                 horses_data.append({
                     "number": horse.horse_number,
                     "name": horse.name,
-                    "odds": horse.odds
+                    "odds": horse.odds,
+                    "scratched": bool(horse.scratched)
                 })
 
             bets_data = {bet.user_id: bet.horse_number for bet in Bet.query.filter_by(race_id=race.id).all()}
@@ -125,6 +137,7 @@ class DataService:
                 "raceNumber": race.race_number,
                 "status": race.status,
                 "winner": race.winner_horse_number,
+                "lastHorse": race.last_horse_number,
                 "horses": horses_data,
                 "bets": bets_data,
                 "bankers": bankers_data
@@ -235,6 +248,20 @@ class DataService:
             db.session.rollback()
             return False
 
+    def update_horse_odds(self, race_id: str, horse_number: int, odds: float) -> bool:
+        """Updates the odds for a specific horse."""
+        try:
+            horse = Horse.query.filter_by(race_id=race_id, horse_number=horse_number).first()
+            if horse:
+                horse.odds = odds
+                db.session.commit()
+                return True
+            return False
+        except Exception as e:
+            logger.error(f"Error updating horse odds: {e}")
+            db.session.rollback()
+            return False
+
     def delete_race_day(self, race_date: str) -> bool:
         """Deletes a race day and all its associated data (races, horses, bets, scores)."""
         try:
@@ -308,21 +335,99 @@ class DataService:
             db.session.rollback()
             return False
             
+    # --- Scoring Config ---
+
+    def get_scoring_config(self) -> dict:
+        """Returns the current scoring configuration."""
+        setting = AppSetting.query.get('scoring_config')
+        if setting:
+            try:
+                return json.loads(setting.value)
+            except Exception:
+                pass
+        return DEFAULT_SCORING_CONFIG.copy()
+
+    def save_scoring_config(self, config: dict) -> bool:
+        """Saves the scoring configuration."""
+        try:
+            setting = AppSetting.query.get('scoring_config')
+            if setting:
+                setting.value = json.dumps(config)
+            else:
+                db.session.add(AppSetting(key='scoring_config', value=json.dumps(config)))
+            db.session.commit()
+            return True
+        except Exception as e:
+            logger.error(f"Error saving scoring config: {e}")
+            db.session.rollback()
+            return False
+
+    def _calc_points(self, odds: float, config: dict) -> int:
+        """Returns points for a winning bet based on odds and scoring config."""
+        tiers = sorted(config.get('tiers', []), key=lambda t: t['min_odds'], reverse=True)
+        for tier in tiers:
+            if odds >= tier['min_odds']:
+                return tier['points']
+        return 1
+
+    # --- Last Horse / Scratch ---
+
+    def set_last_horse(self, race_id: str, horse_number: int) -> bool:
+        """Records the last-place horse for a race."""
+        try:
+            race = Race.query.get(race_id)
+            if race:
+                race.last_horse_number = horse_number
+                db.session.commit()
+                return True
+            return False
+        except Exception as e:
+            logger.error(f"Error setting last horse: {e}")
+            db.session.rollback()
+            return False
+
+    def toggle_horse_scratch(self, race_id: str, horse_number: int) -> dict:
+        """Toggles a horse's scratched status; redirects affected bets to the favorite."""
+        try:
+            horse = Horse.query.filter_by(race_id=race_id, horse_number=horse_number).first()
+            if not horse:
+                return {"success": False, "error": "Horse not found"}
+            horse.scratched = not horse.scratched
+            db.session.flush()
+            redirected = 0
+            if horse.scratched:
+                favorite = (Horse.query
+                            .filter_by(race_id=race_id, scratched=False)
+                            .order_by(Horse.odds.asc())
+                            .first())
+                if favorite:
+                    affected = Bet.query.filter_by(race_id=race_id, horse_number=horse_number).all()
+                    for bet in affected:
+                        bet.horse_number = favorite.horse_number
+                    redirected = len(affected)
+            db.session.commit()
+            return {"success": True, "scratched": horse.scratched, "redirected": redirected}
+        except Exception as e:
+            logger.error(f"Error toggling scratch: {e}")
+            db.session.rollback()
+            return {"success": False, "error": str(e)}
+
     # --- User Score Management ---
 
     def calculate_current_user_scores(self) -> List[Dict[str, Any]]:
         """Calculate and update user scores for the current race day."""
         current_date = datetime.now().strftime('%Y-%m-%d')
-        
+        config = self.get_scoring_config()
+        penalty = config.get('last_place_penalty', 0)
+
         users = User.query.all()
         scores = []
-        
+
         for user in users:
             total_score = 0
             races_won = 0
             banker_correct = False
 
-            # Get all bets for the user on the current day with a join to Race
             user_bets = Bet.query.join(Race).filter(
                 Bet.user_id == user.id,
                 Race.date == current_date
@@ -330,64 +435,51 @@ class DataService:
 
             for bet in user_bets:
                 race = Race.query.get(bet.race_id)
+                if not race or race.status != 'completed':
+                    continue
 
-                if race and race.status == 'completed' and race.winner_horse_number == bet.horse_number:
+                if race.winner_horse_number == bet.horse_number:
                     horse = Horse.query.filter_by(race_id=race.id, horse_number=bet.horse_number).first()
                     if horse:
-                        points = 0
-                        if horse.odds >= 10:
-                            points = 3
-                        elif horse.odds >= 5:
-                            points = 2
-                        else:
-                            points = 1
-
+                        points = self._calc_points(horse.odds, config)
                         total_score += points
                         races_won += 1
-
-                        # Check if this winning bet was a banker
                         if bet.is_banker:
                             banker_correct = True
 
-            # Apply banker multiplier to entire daily score if banker bet was correct
+                elif penalty and race.last_horse_number and race.last_horse_number == bet.horse_number:
+                    total_score += penalty
+
             if banker_correct:
                 total_score *= 2
 
-            # Update or create UserScore record
             user_score = UserScore.query.filter_by(user_id=user.id, race_date=current_date).first()
             if user_score:
                 user_score.score = total_score
             else:
-                user_score = UserScore(id=str(uuid.uuid4()), user_id=user.id, race_date=current_date, score=total_score)
-                db.session.add(user_score)
+                db.session.add(UserScore(id=str(uuid.uuid4()), user_id=user.id, race_date=current_date, score=total_score))
 
             scores.append({"userId": user.id, "name": user.name, "score": total_score, "races_won": races_won})
-            
+
         db.session.commit()
-        
-        # Sort scores to determine rank
         scores.sort(key=lambda x: x['score'], reverse=True)
-        
-        for i, score_entry in enumerate(scores):
-            score_entry['rank'] = i + 1
-        
+        for i, entry in enumerate(scores):
+            entry['rank'] = i + 1
         return scores
 
     def calculate_historical_user_scores(self, race_date: str) -> List[Dict[str, Any]]:
         """Calculate and update user scores for a specific historical race day."""
-        from models import User, Bet, Race, Horse, UserScore
-        from database import db
-        import uuid
-        
+        config = self.get_scoring_config()
+        penalty = config.get('last_place_penalty', 0)
+
         users = User.query.all()
         scores = []
-        
+
         for user in users:
             total_score = 0
             races_won = 0
             banker_correct = False
 
-            # Get all bets for the user on the specified date with a join to Race
             user_bets = Bet.query.join(Race).filter(
                 Bet.user_id == user.id,
                 Race.date == race_date
@@ -395,36 +487,29 @@ class DataService:
 
             for bet in user_bets:
                 race = Race.query.get(bet.race_id)
+                if not race or race.status != 'completed':
+                    continue
 
-                if race and race.status == 'completed' and race.winner_horse_number == bet.horse_number:
+                if race.winner_horse_number == bet.horse_number:
                     horse = Horse.query.filter_by(race_id=race.id, horse_number=bet.horse_number).first()
                     if horse:
-                        points = 0
-                        if horse.odds >= 10:
-                            points = 3
-                        elif horse.odds >= 5:
-                            points = 2
-                        else:
-                            points = 1
-
+                        points = self._calc_points(horse.odds, config)
                         total_score += points
                         races_won += 1
-
-                        # Check if this winning bet was a banker
                         if bet.is_banker:
                             banker_correct = True
 
-            # Apply banker multiplier to entire daily score if banker bet was correct
+                elif penalty and race.last_horse_number and race.last_horse_number == bet.horse_number:
+                    total_score += penalty
+
             if banker_correct:
                 total_score *= 2
 
-            # Update or create UserScore record
             user_score = UserScore.query.filter_by(user_id=user.id, race_date=race_date).first()
             if user_score:
                 user_score.score = total_score
             else:
-                user_score = UserScore(id=str(uuid.uuid4()), user_id=user.id, race_date=race_date, score=total_score)
-                db.session.add(user_score)
+                db.session.add(UserScore(id=str(uuid.uuid4()), user_id=user.id, race_date=race_date, score=total_score))
 
             scores.append({"userId": user.id, "name": user.name, "score": total_score, "races_won": races_won})
 

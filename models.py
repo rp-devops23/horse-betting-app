@@ -23,7 +23,8 @@ class Race(db.Model):
     race_number = db.Column(db.Integer, nullable=False)
     status = db.Column(db.String, default='upcoming')
     winner_horse_number = db.Column(db.Integer, nullable=True)
-    
+    last_horse_number = db.Column(db.Integer, nullable=True)
+
     # Relationships
     horses = db.relationship('Horse', backref='race', lazy=True, cascade='all, delete-orphan')
     bets = db.relationship('Bet', backref='race', lazy=True, cascade='all, delete-orphan')
@@ -35,6 +36,12 @@ class Horse(db.Model):
     horse_number = db.Column(db.Integer, nullable=False)
     name = db.Column(db.String, nullable=False)
     odds = db.Column(db.Float, nullable=False)
+    scratched = db.Column(db.Boolean, default=False)
+
+class AppSetting(db.Model):
+    __tablename__ = 'app_settings'
+    key = db.Column(db.String, primary_key=True)
+    value = db.Column(db.Text, nullable=False)
 
 class Bet(db.Model):
     __tablename__ = 'bets'

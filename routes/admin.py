@@ -91,6 +91,21 @@ def get_file_tree():
     """
     return jsonify({"error": "File tree not available when using a database."}), 400
 
+@admin_bp.route('/settings', methods=['GET'])
+def get_settings():
+    """Returns the current scoring configuration."""
+    return jsonify(data_service.get_scoring_config())
+
+@admin_bp.route('/settings', methods=['PUT'])
+def update_settings():
+    """Saves a new scoring configuration."""
+    config = request.get_json(force=True)
+    if not config or 'tiers' not in config:
+        return jsonify({"error": "Invalid configuration"}), 400
+    if data_service.save_scoring_config(config):
+        return jsonify({"success": True})
+    return jsonify({"error": "Failed to save settings"}), 500
+
 @admin_bp.route('/reset-data', methods=['POST'])
 def reset_all_data():
     """Delete all user data (bets, bankers, users)."""
