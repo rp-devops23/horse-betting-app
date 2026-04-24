@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Settings, Users, Plus, Calendar, Database, Edit2, Trash2, Check, X, LogOut } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { Settings, Users, Plus, Calendar, Database, Edit2, Trash2, Check, X, LogOut, Download, Upload } from 'lucide-react';
 
 import API_BASE from '../config';
 
@@ -10,6 +10,8 @@ const AdminTab = ({ newUserName, setNewUserName, newUserPin, setNewUserPin, hand
   
   const [editingUserId, setEditingUserId] = useState(null);
   const [editingUserName, setEditingUserName] = useState('');
+  const [restoring, setRestoring] = useState(false);
+  const restoreInputRef = useRef(null);
 
   const handleStartEdit = (userId, currentName) => {
     setEditingUserId(userId);
@@ -89,6 +91,41 @@ const AdminTab = ({ newUserName, setNewUserName, newUserPin, setNewUserPin, hand
       showMessage(`Failed to save file: ${error.message}`, "error");
     } finally {
       setSavingFile(false);
+    }
+  };
+
+  const handleDownloadBackup = () => {
+    window.open(`${API_BASE}/admin/backup`, '_blank');
+  };
+
+  const handleRestoreBackup = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (!window.confirm('This will WIPE the entire database and replace it with the backup. Are you sure?')) {
+      e.target.value = '';
+      return;
+    }
+    setRestoring(true);
+    try {
+      const text = await file.text();
+      const backup = JSON.parse(text);
+      const res = await fetch(`${API_BASE}/admin/restore`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(backup),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showMessage('Database restored successfully!', 'success');
+        fetchAllData();
+      } else {
+        showMessage(data.error || 'Restore failed.', 'error');
+      }
+    } catch (err) {
+      showMessage(`Restore error: ${err.message}`, 'error');
+    } finally {
+      setRestoring(false);
+      e.target.value = '';
     }
   };
 
@@ -239,6 +276,34 @@ const AdminTab = ({ newUserName, setNewUserName, newUserPin, setNewUserPin, hand
         <button onClick={handleScrapeResults} className="w-full bg-indigo-500 text-white p-2 rounded-md hover:bg-indigo-600 transition-colors">
           Scrape Results
         </button>
+      </div>
+
+      <div className="bg-gray-100 p-4 rounded-lg space-y-4">
+        <h3 className="font-bold text-lg flex items-center gap-2 text-indigo-600">
+          <Download className="w-5 h-5" />
+          Backup &amp; Restore
+        </h3>
+        <button onClick={handleDownloadBackup} className="w-full flex items-center justify-center gap-2 bg-indigo-500 text-white p-2 rounded-md hover:bg-indigo-600 transition-colors">
+          <Download className="w-4 h-4" />
+          Download Backup
+        </button>
+        <div>
+          <input
+            type="file"
+            accept=".json"
+            ref={restoreInputRef}
+            onChange={handleRestoreBackup}
+            className="hidden"
+          />
+          <button
+            onClick={() => restoreInputRef.current?.click()}
+            disabled={restoring}
+            className="w-full flex items-center justify-center gap-2 bg-red-500 text-white p-2 rounded-md hover:bg-red-600 transition-colors disabled:opacity-50"
+          >
+            <Upload className="w-4 h-4" />
+            {restoring ? 'Restoring...' : 'Restore from Backup'}
+          </button>
+        </div>
       </div>
 
       <div className="bg-gray-100 p-4 rounded-lg space-y-4">

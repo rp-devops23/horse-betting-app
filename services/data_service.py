@@ -316,8 +316,9 @@ class DataService:
         
         for user in users:
             total_score = 0
+            races_won = 0
             banker_correct = False
-            
+
             # Get all bets for the user on the current day with a join to Race
             user_bets = Bet.query.join(Race).filter(
                 Bet.user_id == user.id,
@@ -337,17 +338,18 @@ class DataService:
                             points = 2
                         else:
                             points = 1
-                            
+
                         total_score += points
-                        
+                        races_won += 1
+
                         # Check if this winning bet was a banker
                         if bet.is_banker:
                             banker_correct = True
-            
+
             # Apply banker multiplier to entire daily score if banker bet was correct
             if banker_correct:
                 total_score *= 2
-            
+
             # Update or create UserScore record
             user_score = UserScore.query.filter_by(user_id=user.id, race_date=current_date).first()
             if user_score:
@@ -355,8 +357,8 @@ class DataService:
             else:
                 user_score = UserScore(id=str(uuid.uuid4()), user_id=user.id, race_date=current_date, score=total_score)
                 db.session.add(user_score)
-            
-            scores.append({"userId": user.id, "name": user.name, "score": total_score})
+
+            scores.append({"userId": user.id, "name": user.name, "score": total_score, "races_won": races_won})
             
         db.session.commit()
         
@@ -379,8 +381,9 @@ class DataService:
         
         for user in users:
             total_score = 0
+            races_won = 0
             banker_correct = False
-            
+
             # Get all bets for the user on the specified date with a join to Race
             user_bets = Bet.query.join(Race).filter(
                 Bet.user_id == user.id,
@@ -400,17 +403,18 @@ class DataService:
                             points = 2
                         else:
                             points = 1
-                            
+
                         total_score += points
-                        
+                        races_won += 1
+
                         # Check if this winning bet was a banker
                         if bet.is_banker:
                             banker_correct = True
-            
+
             # Apply banker multiplier to entire daily score if banker bet was correct
             if banker_correct:
                 total_score *= 2
-            
+
             # Update or create UserScore record
             user_score = UserScore.query.filter_by(user_id=user.id, race_date=race_date).first()
             if user_score:
@@ -418,14 +422,14 @@ class DataService:
             else:
                 user_score = UserScore(id=str(uuid.uuid4()), user_id=user.id, race_date=race_date, score=total_score)
                 db.session.add(user_score)
-            
-            scores.append({"userId": user.id, "name": user.name, "score": total_score})
-            
+
+            scores.append({"userId": user.id, "name": user.name, "score": total_score, "races_won": races_won})
+
         db.session.commit()
-        
+
         # Sort scores to determine rank
         scores.sort(key=lambda x: x['score'], reverse=True)
-        
+
         for i, score_entry in enumerate(scores):
             score_entry['rank'] = i + 1
         
@@ -463,6 +467,68 @@ class DataService:
             "date": "all-time",
             "type": "overall"
         }
+
+    # --- Backup / Restore ---
+
+    def backup_all_data(self) -> Dict[str, Any]:
+        """Export every table to a plain dict suitable for JSON serialisation."""
+        from models import User, Race, Horse, Bet, UserScore
+        from datetime import datetime
+        return {
+            "exported_at": datetime.utcnow().isoformat() + "Z",
+            "version": "1",
+            "users":  [{"id": u.id, "name": u.name, "pin": u.pin}
+                       for u in User.query.all()],
+            "races":  [{"id": r.id, "date": r.date, "race_number": r.race_number,
+                        "status": r.status, "winner_horse_number": r.winner_horse_number}
+                       for r in Race.query.all()],
+            "horses": [{"id": h.id, "race_id": h.race_id, "horse_number": h.horse_number,
+                        "name": h.name, "odds": h.odds}
+                       for h in Horse.query.all()],
+            "bets":   [{"id": b.id, "user_id": b.user_id, "race_id": b.race_id,
+                        "horse_number": b.horse_number, "is_banker": b.is_banker,
+                        "points_awarded": b.points_awarded}
+                       for b in Bet.query.all()],
+            "scores": [{"id": s.id, "user_id": s.user_id, "race_date": s.race_date,
+                        "score": s.score}
+                       for s in UserScore.query.all()],
+        }
+
+    def restore_all_data(self, backup: Dict[str, Any]) -> bool:
+        """Wipe the database and reimport from a backup dict."""
+        from models import User, Race, Horse, Bet, UserScore
+        try:
+            UserScore.query.delete()
+            Bet.query.delete()
+            Horse.query.delete()
+            Race.query.delete()
+            User.query.delete()
+            db.session.flush()
+
+            for u in backup.get("users", []):
+                db.session.add(User(id=u["id"], name=u["name"], pin=u.get("pin")))
+            for r in backup.get("races", []):
+                db.session.add(Race(id=r["id"], date=r["date"],
+                                    race_number=r["race_number"], status=r["status"],
+                                    winner_horse_number=r.get("winner_horse_number")))
+            for h in backup.get("horses", []):
+                db.session.add(Horse(id=h["id"], race_id=h["race_id"],
+                                     horse_number=h["horse_number"],
+                                     name=h["name"], odds=h["odds"]))
+            for b in backup.get("bets", []):
+                db.session.add(Bet(id=b["id"], user_id=b["user_id"],
+                                   race_id=b["race_id"], horse_number=b["horse_number"],
+                                   is_banker=b["is_banker"],
+                                   points_awarded=b.get("points_awarded")))
+            for s in backup.get("scores", []):
+                db.session.add(UserScore(id=s["id"], user_id=s["user_id"],
+                                         race_date=s["race_date"], score=s["score"]))
+            db.session.commit()
+            return True
+        except Exception as e:
+            logger.error(f"Restore failed: {e}")
+            db.session.rollback()
+            return False
 
     # --- Scraping Logic ---
 

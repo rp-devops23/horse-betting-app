@@ -52,6 +52,30 @@ def delete_race_day(race_date):
     else:
         return jsonify({"success": False, "error": "Race day not found or deletion failed."}), 404
 
+@admin_bp.route('/backup', methods=['GET'])
+def backup_data():
+    """Download a full JSON backup of the database."""
+    backup = data_service.backup_all_data()
+    filename = f"lekours_backup_{backup['exported_at'][:10]}.json"
+    from flask import Response
+    import json
+    return Response(
+        json.dumps(backup, indent=2, ensure_ascii=False),
+        mimetype='application/json',
+        headers={'Content-Disposition': f'attachment; filename="{filename}"'}
+    )
+
+@admin_bp.route('/restore', methods=['POST'])
+def restore_data():
+    """Restore the database from a JSON backup. Wipes all existing data first."""
+    backup = request.get_json(force=True)
+    if not backup or backup.get('version') != '1':
+        return jsonify({"error": "Invalid or missing backup payload."}), 400
+    success = data_service.restore_all_data(backup)
+    if success:
+        return jsonify({"success": True, "message": "Database restored from backup."}), 200
+    return jsonify({"success": False, "error": "Restore failed — check server logs."}), 500
+
 @admin_bp.route('/files', methods=['GET'])
 def get_file_tree():
     """

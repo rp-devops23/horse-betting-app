@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, RefreshCw, ChevronDown, Trophy, Edit3, X, Users } from 'lucide-react';
+import { Calendar, ChevronDown, Trophy, Edit3, X, Users } from 'lucide-react';
 import API_BASE from '../config';
 
 const SkeletonCard = () => (
@@ -95,59 +95,32 @@ const RaceDayTab = ({ races, currentRaceDay, availableRaceDays, selectedRaceDay,
           Races
         </h2>
         
-        {/* Mobile-friendly controls */}
-        <div className="space-y-4">
-          {/* Race Day Selector */}
-          <div className="relative">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Select Race Day
-            </label>
-            <select 
-              value={selectedRaceDay || ''} 
-              onChange={(e) => fetchRaceDayData(e.target.value)}
-              className="w-full appearance-none bg-white border border-gray-300 rounded-lg px-4 py-3 pr-10 text-base focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 min-h-[48px]"
-            >
-              <option value="">Choose a race day...</option>
-              {availableRaceDays.map(day => (
-                <option key={day} value={day}>{day}</option>
-              ))}
-            </select>
-            <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
-          </div>
-          
-          {/* Refresh Button */}
-          <div className="flex justify-center">
-            <button 
-              onClick={() => selectedRaceDay ? fetchRaceDayData(selectedRaceDay) : fetchAllData()} 
-              className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors duration-200 min-h-[48px]"
-              title="Refresh"
-            >
-              <RefreshCw className="w-5 h-5" />
-              Refresh Data
-            </button>
-          </div>
+        {/* Race Day Selector */}
+        <div className="relative">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Select Race Day
+          </label>
+          <select
+            value={selectedRaceDay || ''}
+            onChange={(e) => fetchRaceDayData(e.target.value)}
+            className="w-full appearance-none bg-white border border-gray-300 rounded-lg px-4 py-3 pr-10 text-base focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 min-h-[48px]"
+          >
+            <option value="">Choose a race day...</option>
+            {availableRaceDays.map(day => (
+              <option key={day} value={day}>{day}</option>
+            ))}
+          </select>
+          <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
         </div>
       </div>
 
-      {/* Current race day indicator */}
-      {selectedRaceDay && (
-        <div className="mb-4 p-3 bg-indigo-50 rounded-lg border border-indigo-200">
-          <p className="text-indigo-800 font-medium">
-            Viewing races for: <span className="font-bold">{selectedRaceDay}</span>
-            {currentRaceDay?.date === selectedRaceDay && (
-              <span className="ml-2 text-xs bg-indigo-200 text-indigo-800 px-2 py-1 rounded-full">Current</span>
-            )}
-          </p>
-        </div>
-      )}
-
-      {/* Race Day Scores Section - Moved to top */}
+      {/* Race Day Scores Section */}
       {selectedRaceDay && (
         <div className="mb-8 bg-white p-6 rounded-lg shadow-lg">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-xl font-bold flex items-center gap-2 text-indigo-700">
               <Trophy className="w-5 h-5" />
-              Race Day Scores - {selectedRaceDay}
+              Race Day Scores
             </h3>
             {loadingScores && (
               <div className="text-sm text-gray-500">Loading scores...</div>
@@ -180,6 +153,7 @@ const RaceDayTab = ({ races, currentRaceDay, availableRaceDays, selectedRaceDay,
                   <div className="text-right">
                     <span className="font-bold text-lg text-indigo-600">{score.score}</span>
                     <span className="text-sm text-gray-500 ml-1">pts</span>
+                    <div className="text-xs text-gray-400">{score.races_won ?? 0} won</div>
                   </div>
                 </div>
               ))}

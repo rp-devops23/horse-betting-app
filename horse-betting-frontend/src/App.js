@@ -427,7 +427,6 @@ const HorseBettingApp = () => {
             </>
           ) : (
             <div className="text-center">
-              <p className="text-gray-500 text-sm mb-3">Who are you?</p>
               <div className="flex flex-wrap justify-center gap-2 mb-3">
                 {users.map(user => (
                   <button
@@ -570,18 +569,18 @@ const HorseBettingApp = () => {
             )}
 
             {activeTab === 'bets' && (
-              <UserBetsTab 
-                races={races} 
-                bets={bets} 
-                bankers={bankers} 
+              <UserBetsTab
+                races={races}
+                bets={bets}
+                bankers={bankers}
                 users={users}
                 selectedUserId={selectedUserId}
-                setSelectedUserId={setSelectedUserId}
+                handleUserSelect={handleUserSelect}
                 availableRaceDays={availableRaceDays}
                 selectedRaceDay={selectedRaceDay}
                 fetchRaceDayData={fetchRaceDayData}
-                handleSetBet={handleSetBet} 
-                handleSetBanker={handleSetBanker} 
+                handleSetBet={handleSetBet}
+                handleSetBanker={handleSetBanker}
               />
             )}
 
