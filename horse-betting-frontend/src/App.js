@@ -31,6 +31,11 @@ const HorseBettingApp = () => {
   const [pinInput, setPinInput] = useState('');
   const [newUserPin, setNewUserPin] = useState('');
 
+  // Self-registration state
+  const [showRegisterForm, setShowRegisterForm] = useState(false);
+  const [registerName, setRegisterName] = useState('');
+  const [registerPin, setRegisterPin] = useState('');
+
   // Admin tab state
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
   const [adminPassword, setAdminPassword] = useState('');
@@ -367,6 +372,28 @@ const HorseBettingApp = () => {
     setSelectedUserId(null);
   }, []);
 
+  const handleRegister = useCallback(async () => {
+    if (!registerName.trim()) { showMessage('Please enter your name.', 'info'); return; }
+    if (registerPin.length !== 4) { showMessage('PIN must be exactly 4 digits.', 'info'); return; }
+    try {
+      const res = await fetch(`${API_BASE}/users`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: registerName.trim(), pin: registerPin }),
+      });
+      const data = await res.json();
+      if (!res.ok) { showMessage(data.error || 'Registration failed.', 'error'); return; }
+      await fetchAllData();
+      setSelectedUserId(data.id);
+      setShowRegisterForm(false);
+      setRegisterName('');
+      setRegisterPin('');
+      showMessage(`Welcome, ${data.name}!`, 'success');
+    } catch (e) {
+      showMessage(`Error: ${e.message}`, 'error');
+    }
+  }, [registerName, registerPin, fetchAllData, showMessage]);
+
   const MessageBox = ({ text, type }) => {
     const bgColor = type === 'error' ? 'bg-red-500' : type === 'success' ? 'bg-green-500' : 'bg-blue-500';
     return (
@@ -379,7 +406,16 @@ const HorseBettingApp = () => {
   return (
     <div className="min-h-screen bg-gray-100 font-sans antialiased text-gray-800">
       <div className="container mx-auto p-4 sm:p-8">
-        <h1 className="text-4xl font-extrabold text-center text-indigo-800 mb-4 tracking-tight">Payen family's Lekours</h1>
+        <div className="relative flex items-center justify-center mb-4">
+          <h1 className="text-4xl font-extrabold text-center text-indigo-800 tracking-tight">Payen family's Lekours</h1>
+          <button
+            onClick={handleAdminTabClick}
+            className="absolute right-0 p-2 text-gray-400 hover:text-indigo-600 transition-colors"
+            title="Admin"
+          >
+            <Settings className="w-5 h-5" />
+          </button>
+        </div>
 
         {/* User selector bar */}
         <div className="flex items-center justify-center gap-3 mb-6">
@@ -392,7 +428,7 @@ const HorseBettingApp = () => {
           ) : (
             <div className="text-center">
               <p className="text-gray-500 text-sm mb-3">Who are you?</p>
-              <div className="flex flex-wrap justify-center gap-2">
+              <div className="flex flex-wrap justify-center gap-2 mb-3">
                 {users.map(user => (
                   <button
                     key={user.id}
@@ -403,6 +439,39 @@ const HorseBettingApp = () => {
                   </button>
                 ))}
               </div>
+              {!showRegisterForm ? (
+                <button
+                  onClick={() => setShowRegisterForm(true)}
+                  className="text-sm text-indigo-500 hover:text-indigo-700 underline transition-colors"
+                >
+                  New here? Create your account
+                </button>
+              ) : (
+                <div className="mt-3 p-4 bg-white rounded-lg shadow-md max-w-xs mx-auto">
+                  <p className="text-sm font-semibold text-indigo-700 mb-3">Create your account</p>
+                  <input
+                    type="text"
+                    placeholder="Your name"
+                    value={registerName}
+                    onChange={e => setRegisterName(e.target.value)}
+                    className="w-full p-2 border border-gray-300 rounded-md text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                  <input
+                    type="password"
+                    inputMode="numeric"
+                    maxLength={4}
+                    placeholder="Choose a 4-digit PIN"
+                    value={registerPin}
+                    onChange={e => setRegisterPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                    onKeyPress={e => e.key === 'Enter' && handleRegister()}
+                    className="w-full p-2 border border-gray-300 rounded-md text-sm mb-3 text-center tracking-widest focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                  <div className="flex gap-2">
+                    <button onClick={handleRegister} className="flex-1 bg-indigo-600 text-white py-2 rounded-md text-sm hover:bg-indigo-700 transition-colors">Join</button>
+                    <button onClick={() => { setShowRegisterForm(false); setRegisterName(''); setRegisterPin(''); }} className="flex-1 bg-gray-200 text-gray-700 py-2 rounded-md text-sm hover:bg-gray-300 transition-colors">Cancel</button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -417,7 +486,6 @@ const HorseBettingApp = () => {
                   {activeTab === 'races' && 'Races'}
                   {activeTab === 'bets' && 'Your Bets'}
                   {activeTab === 'leaderboard' && 'Leaderboard'}
-                  {activeTab === 'admin' && 'Admin'}
                 </span>
                 <button
                   onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
@@ -458,13 +526,6 @@ const HorseBettingApp = () => {
                     <Trophy className="w-5 h-5" />
                     Leaderboard
                   </button>
-                  <button 
-                    onClick={handleAdminTabClick} 
-                    className={`w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-indigo-50 transition-colors ${activeTab === 'admin' ? 'bg-indigo-100 text-indigo-700' : 'text-gray-700'}`}
-                  >
-                    <Settings className="w-5 h-5" />
-                    Admin
-                  </button>
                 </div>
               )}
             </div>
@@ -487,10 +548,6 @@ const HorseBettingApp = () => {
                 <button onClick={() => handleTabChange('leaderboard')} className={`py-3 px-6 rounded-md transition-colors duration-200 font-semibold ${activeTab === 'leaderboard' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-600 hover:text-indigo-700'}`}>
                   <Trophy className="inline-block w-5 h-5 mr-2" />
                   Leaderboard
-                </button>
-                <button onClick={handleAdminTabClick} className={`py-3 px-6 rounded-md transition-colors duration-200 font-semibold ${activeTab === 'admin' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-600 hover:text-indigo-700'}`}>
-                  <Settings className="inline-block w-5 h-5 mr-2" />
-                  Admin
                 </button>
               </div>
             </div>
