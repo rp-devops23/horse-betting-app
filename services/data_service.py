@@ -33,9 +33,9 @@ logger = logging.getLogger(__name__)
 # A helper function to get the scrapers
 def get_scrapers():
     """Import and return the scraper functions."""
-    from utils.smspariaz_scraper import scrape_horses_from_smspariaz
+    from utils.supertote_scraper import scrape_races_from_supertote
     from utils.results_scraper import scrape_results_with_fallback
-    return scrape_horses_from_smspariaz, scrape_results_with_fallback
+    return scrape_races_from_supertote, scrape_results_with_fallback
 
 class DataService:
     """
@@ -635,10 +635,10 @@ class DataService:
 
     # --- Scraping Logic ---
 
-    def scrape_new_races(self) -> Dict[str, Any]:
-        """Scrapes horse data for a new race day and returns it."""
-        scrape_horses_from_smspariaz, _ = get_scrapers()
-        return scrape_horses_from_smspariaz()
+    def scrape_new_races(self, date_str: str = None) -> Dict[str, Any]:
+        """Scrapes races from supertote.mu for today (or a given date)."""
+        scrape_races_from_supertote, _ = get_scrapers()
+        return scrape_races_from_supertote(date_str)
 
     def scrape_race_results(self) -> Dict[str, Any]:
         """Scrapes results for completed races and returns them."""

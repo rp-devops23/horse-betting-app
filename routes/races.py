@@ -15,11 +15,12 @@ def get_races():
 def scrape_races():
     """Scrapes races for a new race day and sets it as current."""
     try:
-        current_day = data_service.scrape_new_races()
+        date_str = (request.json or {}).get('date')  # optional: "YYYY-MM-DD"
+        current_day = data_service.scrape_new_races(date_str)
         data_service.save_current_race_day_data(current_day)
-        
-        print(f"[OK] Scraped {len(current_day.get('races', []))} races for {current_day.get('date')}")
-        return jsonify({"success": True, "message": "Races scraped and saved successfully."}), 200
+        n = len(current_day.get('races', []))
+        print(f"[OK] Scraped {n} races for {current_day.get('date')} (supertote.mu)")
+        return jsonify({"success": True, "message": f"{n} courses importées depuis supertote.mu.", "date": current_day.get('date')}), 200
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
