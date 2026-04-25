@@ -219,6 +219,29 @@ const RaceDayTab = ({
                       )}
                     </div>
                     {race.name && <p className="text-xs text-gray-400 mt-0.5 truncate">{race.name}</p>}
+                    {/* Banker indicators */}
+                    {(() => {
+                      const raceBankers = (users || []).filter(u => bankers && bankers[String(u.id)] === race.id);
+                      if (!raceBankers.length) return null;
+                      return (
+                        <div className="flex items-center gap-1 mt-1">
+                          <Star className="w-3 h-3 text-yellow-500 fill-yellow-500 flex-shrink-0" />
+                          {raceBankers.map(u => {
+                            const colour = getUserColour(users, u.id);
+                            const isMe = String(u.id) === String(selectedUserId);
+                            return (
+                              <span
+                                key={u.id}
+                                title={`${u.name} — banker`}
+                                className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white ${colour} ${isMe ? 'ring-2 ring-yellow-400 ring-offset-1' : ''}`}
+                              >
+                                {initials(u.name)}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
                     {timeLocked && race.status !== 'completed' && (
                       <p className="text-xs text-red-400 mt-0.5 flex items-center gap-1">
                         <Lock className="w-3 h-3" /> Paris verrouillés — course démarrée
