@@ -98,12 +98,9 @@ const HomePage = () => {
             {sortedTiers ? (
               <>
                 {sortedTiers.map((tier, i) => {
-                  const next = sortedTiers[i + 1];
                   const label = i === 0
-                    ? `Pari gagnant (cote ≥ ${tier.min_odds})`
-                    : next
-                    ? `Pari gagnant (cote ${tier.min_odds}–${next.min_odds - 0.01})`
-                    : `Pari gagnant (cote < ${sortedTiers[i - 1]?.min_odds ?? tier.min_odds})`;
+                    ? `Pari gagnant (cote ${tier.min_odds}+)`
+                    : `Pari gagnant (cote ${tier.min_odds > 0 ? tier.min_odds : 1}–${sortedTiers[i - 1].min_odds})`;
                   const colour = TIER_COLOURS[i % TIER_COLOURS.length];
                   return (
                     <div key={i} className="flex items-center justify-between">
