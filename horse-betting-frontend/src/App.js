@@ -39,6 +39,9 @@ const HorseBettingApp = () => {
   const [userPickerOpen, setUserPickerOpen] = useState(false);
   const userPickerRef = useRef(null);
 
+  // Cold-start indicator
+  const [slowLoad, setSlowLoad] = useState(false);
+
   // Admin tab state
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
   const [adminPassword, setAdminPassword] = useState('');
@@ -54,6 +57,7 @@ const HorseBettingApp = () => {
 
   const fetchAllData = useCallback(async () => {
     setLoading(true);
+    const slowTimer = setTimeout(() => setSlowLoad(true), 3000);
     try {
       const usersRes = await fetch(`${API_BASE}/users`);
       const usersData = await usersRes.json();
@@ -97,6 +101,8 @@ const HorseBettingApp = () => {
       showMessage(`Connection to server failed: ${error.message}`, 'error');
       console.error('Error in fetchAllData:', error);
     } finally {
+      clearTimeout(slowTimer);
+      setSlowLoad(false);
       setLoading(false);
     }
   }, [showMessage, selectedRaceDay]);
@@ -418,6 +424,18 @@ const HorseBettingApp = () => {
 
   return (
     <div className="min-h-screen bg-gray-100 font-sans antialiased text-gray-800">
+
+      {/* Cold-start banner */}
+      {slowLoad && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-xl shadow-2xl px-8 py-6 flex flex-col items-center gap-3 max-w-xs text-center">
+            <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+            <p className="font-semibold text-gray-800">Le serveur se réveille…</p>
+            <p className="text-sm text-gray-500">Première connexion de la journée — merci de patienter quelques secondes.</p>
+          </div>
+        </div>
+      )}
+
       {/* Fixed mobile bottom tab bar */}
       <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 shadow-lg">
         <div className="absolute top-1 right-2 text-xs font-semibold text-amber-600 opacity-60">β</div>
