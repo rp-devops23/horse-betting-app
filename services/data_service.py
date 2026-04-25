@@ -640,7 +640,32 @@ class DataService:
         scrape_races_from_supertote, _ = get_scrapers()
         return scrape_races_from_supertote(date_str)
 
-    def scrape_race_results(self) -> Dict[str, Any]:
-        """Scrapes results for completed races and returns them."""
-        _, scrape_results_with_fallback = get_scrapers()
-        return scrape_results_with_fallback()
+    def scrape_race_results(self, date_str: str = None) -> Dict[str, Any]:
+        """Scrapes results from supertote.mu and applies them to the DB."""
+        from utils.results_scraper import scrape_race_results_from_supertote
+
+        if date_str is None:
+            date_str = datetime.now().strftime('%Y-%m-%d')
+
+        raw_results = scrape_race_results_from_supertote(date_str)
+        applied = []
+
+        for result in raw_results:
+            race_number = result['race_number']
+            winner = result['winner_horse_number']
+
+            # Look up the race by date + race_number (works regardless of ID format)
+            race = Race.query.filter_by(date=date_str, race_number=race_number).first()
+            if not race:
+                logger.warning("Race %d on %s not found in DB — skipping", race_number, date_str)
+                continue
+
+            if self.save_race_result(race.id, winner):
+                applied.append({"race_number": race_number, "race_id": race.id, "winner": winner})
+                logger.info("[OK] Race %d winner set to horse #%d", race_number, winner)
+
+        if applied:
+            self.calculate_current_user_scores()
+            logger.info("[OK] Scores recalculated after applying %d result(s)", len(applied))
+
+        return {"date": date_str, "results_applied": applied, "count": len(applied)}

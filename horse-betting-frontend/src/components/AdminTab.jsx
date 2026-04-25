@@ -159,7 +159,19 @@ const AdminTab = ({
     try {
       const res = await fetch(`${API_BASE}/races/scrape`, { method: 'POST' });
       const data = await res.json();
-      if (data.success) { showMessage('Courses scrapées !', 'success'); fetchAllData(); }
+      if (data.success) { showMessage('Courses importées !', 'success'); fetchAllData(); }
+      else showMessage(data.error, 'error');
+    } catch (err) { showMessage(`Erreur : ${err.message}`, 'error'); }
+  };
+
+  const handleScrapeResults = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/races/results`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const data = await res.json();
+      if (data.success) { showMessage(data.message, 'success'); fetchAllData(); }
       else showMessage(data.error, 'error');
     } catch (err) { showMessage(`Erreur : ${err.message}`, 'error'); }
   };
@@ -295,6 +307,9 @@ const AdminTab = ({
         </h3>
         <button onClick={handleScrapeRaces} className="w-full bg-indigo-500 text-white p-2 rounded-md hover:bg-indigo-600 transition-colors text-sm">
           Importer / Mettre à jour les courses
+        </button>
+        <button onClick={handleScrapeResults} className="w-full bg-green-600 text-white p-2 rounded-md hover:bg-green-700 transition-colors text-sm">
+          Récupérer les résultats depuis supertote.mu
         </button>
       </div>
 

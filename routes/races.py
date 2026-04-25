@@ -135,9 +135,11 @@ def update_horse_odds(race_id, horse_number):
 
 @races_bp.route('/races/results', methods=['POST'])
 def scrape_results():
-    """Scrapes results for completed races."""
+    """Scrapes results from supertote.mu and applies them to the DB."""
     try:
-        results = data_service.scrape_race_results()
-        return jsonify({"success": True, "message": "Race results scraped successfully.", "data": results}), 200
+        date_str = (request.json or {}).get('date')  # optional: "YYYY-MM-DD"
+        data = data_service.scrape_race_results(date_str)
+        n = data.get('count', 0)
+        return jsonify({"success": True, "message": f"{n} résultat(s) importé(s) pour le {data.get('date')}.", "data": data}), 200
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
