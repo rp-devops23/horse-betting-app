@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, ChevronDown, Trophy, Edit3, X, Star, Check, AlertCircle, Flag, Lock } from 'lucide-react';
+import API_BASE from '../config';
+import { initials, getUserColour } from '../utils/userColors';
 
 // Returns true if it's past the race start time in Mauritius (GMT+4)
 const isRaceTimeLocked = (raceTime, raceDate) => {
@@ -15,8 +17,6 @@ const isRaceTimeLocked = (raceTime, raceDate) => {
   const muMin = muNow.getUTCMinutes();
   return muH * 60 + muMin >= raceH * 60 + raceM;
 };
-import API_BASE from '../config';
-import { initials, getUserColour } from '../utils/userColors';
 
 const SkeletonCard = () => (
   <div className="bg-white p-4 rounded-lg shadow animate-pulse">
