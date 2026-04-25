@@ -187,7 +187,14 @@ const RaceDayTab = ({
       {/* Race list */}
       {races.length > 0 ? (
         <div className="space-y-4">
-          {races.map(race => {
+          {(() => {
+            const firstRace = [...races].sort((a, b) => {
+              const numA = parseInt((a.id.match(/R(\d+)/i) || [])[1] || 99);
+              const numB = parseInt((b.id.match(/R(\d+)/i) || [])[1] || 99);
+              return numA - numB;
+            })[0];
+            const bankerLocked = firstRace ? isRaceTimeLocked(firstRace.time, selectedRaceDay) : false;
+            return races.map(race => {
             const myBet = bets?.find(b => String(b.userId) === String(selectedUserId) && b.raceId === race.id);
             const isBanker = bankers && selectedUserId && bankers[String(selectedUserId)] === race.id;
             const timeLocked = isRaceTimeLocked(race.time, selectedRaceDay);
@@ -253,11 +260,11 @@ const RaceDayTab = ({
                     {selectedUserId && (
                       <button
                         onClick={() => handleSetBanker(race.id)}
-                        disabled={race.status === 'completed' || timeLocked}
+                        disabled={bankerLocked}
                         className={`p-2 rounded-full transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
                           isBanker ? 'text-yellow-500 bg-yellow-100' : 'text-gray-300 hover:text-yellow-400'
                         }`}
-                        title={isBanker ? 'Retirer banker (×2)' : 'Définir comme banker (×2)'}
+                        title={bankerLocked ? 'Banker verrouillé — R1 démarrée' : isBanker ? 'Retirer banker (×2)' : 'Définir comme banker (×2)'}
                       >
                         <Star className={`w-5 h-5 ${isBanker ? 'fill-yellow-500' : ''}`} />
                       </button>
@@ -484,7 +491,8 @@ const RaceDayTab = ({
 
               </div>
             );
-          })}
+          });
+          })()}
         </div>
       ) : (
         <div className="text-center py-10">
