@@ -164,6 +164,18 @@ const AdminTab = ({
     } catch (err) { showMessage(`Erreur : ${err.message}`, 'error'); }
   };
 
+  const handleUpdateOdds = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/races/update-odds`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const data = await res.json();
+      if (data.success) { showMessage(data.message, 'success'); fetchAllData(); }
+      else showMessage(data.error || 'Erreur inconnue', 'error');
+    } catch (err) { showMessage(`Erreur : ${err.message}`, 'error'); }
+  };
+
   const handleScrapeResults = async () => {
     try {
       const res = await fetch(`${API_BASE}/races/results`, {
@@ -306,10 +318,13 @@ const AdminTab = ({
           Journées de courses
         </h3>
         <button onClick={handleScrapeRaces} className="w-full bg-indigo-500 text-white p-2 rounded-md hover:bg-indigo-600 transition-colors text-sm">
-          Importer / Mettre à jour les courses
+          Importer les courses (supertote.mu)
+        </button>
+        <button onClick={handleUpdateOdds} className="w-full bg-orange-500 text-white p-2 rounded-md hover:bg-orange-600 transition-colors text-sm">
+          Mettre à jour les côtes (smspariaz.com)
         </button>
         <button onClick={handleScrapeResults} className="w-full bg-green-600 text-white p-2 rounded-md hover:bg-green-700 transition-colors text-sm">
-          Récupérer les résultats depuis supertote.mu
+          Récupérer les résultats (supertote.mu)
         </button>
       </div>
 

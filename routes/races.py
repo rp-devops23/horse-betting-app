@@ -133,6 +133,21 @@ def update_horse_odds(race_id, horse_number):
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
+@races_bp.route('/races/update-odds', methods=['POST'])
+def update_odds():
+    """Scrapes live Win odds from smspariaz.com and updates the current race day."""
+    try:
+        from utils.smspariaz_odds_scraper import scrape_odds_from_smspariaz
+        date_str = (request.json or {}).get('date') or datetime.now().strftime('%Y-%m-%d')
+        odds_data = scrape_odds_from_smspariaz()
+        if not odds_data:
+            return jsonify({"success": False, "error": "Aucune côte trouvée sur smspariaz.com"}), 200
+        n = data_service.update_race_day_odds(date_str, odds_data)
+        print(f"[OK] Updated odds for {n} horse(s) on {date_str} (smspariaz.com)")
+        return jsonify({"success": True, "message": f"{n} côte(s) mise(s) à jour.", "date": date_str}), 200
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
 @races_bp.route('/races/results', methods=['POST'])
 def scrape_results():
     """Scrapes results from supertote.mu and applies them to the DB."""

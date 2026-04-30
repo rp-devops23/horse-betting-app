@@ -263,11 +263,39 @@ def _scrape_race_page(
 # Public entry point
 # ---------------------------------------------------------------------------
 
+def _detect_next_race_date(session: requests.Session) -> str | None:
+    """Auto-detect the next race day by fetching /racing (no date).
+
+    Supertote's /racing page always shows the current or next upcoming race day.
+    We parse the date from the race links on that page.
+
+    Returns a YYYY-MM-DD string, or None if detection fails.
+    """
+    soup = _fetch(f"{BASE_URL}/racing", session)
+    if not soup:
+        return None
+
+    # Race links look like /racing/02-may-2026/champ-de-mars-1
+    race_link = soup.find("a", href=re.compile(r"/racing/\d{2}-[a-z]{3}-\d{4}/"))
+    if not race_link or not hasattr(race_link, "get"):
+        return None
+
+    m = re.search(r"/racing/(\d{2}-[a-z]{3}-\d{4})/", str(race_link.get("href", "")))
+    if not m:
+        return None
+
+    try:
+        return datetime.strptime(m.group(1), "%d-%b-%Y").strftime("%Y-%m-%d")
+    except ValueError:
+        return None
+
+
 def scrape_races_from_supertote(date_str: str | None = None) -> dict:
     """Scrape horse racing data from supertote.mu for a given date.
 
     Args:
-        date_str: Race date in YYYY-MM-DD format. Defaults to today.
+        date_str: Race date in YYYY-MM-DD format.
+                  If omitted, auto-detects the next race day from /racing.
 
     Returns:
         A day_data dict compatible with DataService.save_current_race_day_data():
@@ -310,8 +338,16 @@ def scrape_races_from_supertote(date_str: str | None = None) -> dict:
         (jockey, trainer, age, weight_kg, form, place_odds) are returned for
         informational use and are safely ignored during save.
     """
+    session = requests.Session()
+
     if date_str is None:
-        date_str = datetime.now().strftime("%Y-%m-%d")
+        logger.info("No date provided — auto-detecting next race day from %s/racing", BASE_URL)
+        date_str = _detect_next_race_date(session)
+        if date_str:
+            logger.info("Auto-detected race date: %s", date_str)
+        else:
+            logger.warning("Could not auto-detect race date; falling back to today.")
+            date_str = datetime.now().strftime("%Y-%m-%d")
 
     supertote_date = _to_supertote_date(date_str)
     index_url = f"{BASE_URL}/racing/{supertote_date}"
@@ -324,8 +360,6 @@ def scrape_races_from_supertote(date_str: str | None = None) -> dict:
         "bankers": {},
         "userScores": [],
     }
-
-    session = requests.Session()
 
     # ------------------------------------------------------------------
     # Step 1: fetch race-day index and collect individual race URLs

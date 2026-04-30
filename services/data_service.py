@@ -633,6 +633,47 @@ class DataService:
             db.session.rollback()
             return False
 
+    # --- Odds Update ---
+
+    def update_race_day_odds(self, date_str: str, odds_data: dict) -> int:
+        """Update horse Win odds from smspariaz data without touching bets.
+
+        Args:
+            date_str: Race date in YYYY-MM-DD format.
+            odds_data: {race_number (int): {horse_number (int): odds (float)}}
+
+        Returns:
+            Number of horses whose odds were updated.
+        """
+        count = 0
+        try:
+            for race_number, horse_odds in odds_data.items():
+                race = Race.query.filter_by(
+                    date=date_str, race_number=int(race_number)
+                ).first()
+                if not race:
+                    logger.warning(
+                        "update_race_day_odds: race %s on %s not found in DB",
+                        race_number, date_str,
+                    )
+                    continue
+                for horse_number, odds in horse_odds.items():
+                    if odds <= 0:
+                        continue
+                    horse = Horse.query.filter_by(
+                        race_id=race.id, horse_number=int(horse_number)
+                    ).first()
+                    if horse:
+                        horse.odds = odds
+                        count += 1
+            db.session.commit()
+            logger.info("update_race_day_odds: updated %d horse(s) for %s", count, date_str)
+        except Exception as exc:
+            logger.error("update_race_day_odds error: %s", exc)
+            db.session.rollback()
+            return 0
+        return count
+
     # --- Scraping Logic ---
 
     def scrape_new_races(self, date_str: str = None) -> Dict[str, Any]:

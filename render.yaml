@@ -12,6 +12,8 @@ services:
       - key: FLASK_DEBUG
         value: false
 
+  # ── Race card scraping (supertote.mu — requests only, no browser needed) ──────
+
   # Thu+Fri 18:00 MUT (UTC+4) = 14:00 UTC — evening check (cards published Thu/Fri)
   - type: cron
     name: scrape-races-evening
@@ -34,6 +36,22 @@ services:
     buildCommand: pip install -r requirements.txt
     startCommand: python scripts/scrape_weekend_races.py
     schedule: "0 4 * * 6,0"
+    envVars:
+      - key: FLASK_ENV
+        value: production
+
+  # ── Odds update (smspariaz.com — requires Chrome/Chromium) ───────────────────
+  # Runs Sat+Sun every hour from 08:00–12:00 MUT (04:00–08:00 UTC).
+  # The script is a no-op once the first race has started.
+
+  - type: cron
+    name: update-odds
+    env: python
+    runtime: python
+    pythonVersion: "3.11.0"
+    buildCommand: apt-get install -y chromium-browser chromium-driver 2>/dev/null || true && pip install -r requirements.txt
+    startCommand: python scripts/update_odds.py
+    schedule: "0 4,5,6,7,8 * * 6,0"
     envVars:
       - key: FLASK_ENV
         value: production
