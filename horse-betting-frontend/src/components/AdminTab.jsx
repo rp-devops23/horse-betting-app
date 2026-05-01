@@ -14,6 +14,7 @@ const AdminTab = ({
   const [usersWithPins, setUsersWithPins] = useState([]);
   const [showPins, setShowPins] = useState({}); // { userId: true/false }
   const [restoring, setRestoring] = useState(false);
+  const [loadingAction, setLoadingAction] = useState(null); // 'scrape' | 'odds' | 'results'
   const restoreInputRef = useRef(null);
 
   // Scoring config state
@@ -156,15 +157,18 @@ const AdminTab = ({
   };
 
   const handleScrapeRaces = async () => {
+    setLoadingAction('scrape');
     try {
       const res = await fetch(`${API_BASE}/races/scrape`, { method: 'POST' });
       const data = await res.json();
-      if (data.success) { showMessage('Courses importées !', 'success'); fetchAllData(); }
+      if (data.success) { showMessage(data.message || 'Courses importées !', 'success'); fetchAllData(); }
       else showMessage(data.error, 'error');
     } catch (err) { showMessage(`Erreur : ${err.message}`, 'error'); }
+    finally { setLoadingAction(null); }
   };
 
   const handleUpdateOdds = async () => {
+    setLoadingAction('odds');
     try {
       const res = await fetch(`${API_BASE}/races/update-odds`, {
         method: 'POST',
@@ -174,9 +178,11 @@ const AdminTab = ({
       if (data.success) { showMessage(data.message, 'success'); fetchAllData(); }
       else showMessage(data.error || 'Erreur inconnue', 'error');
     } catch (err) { showMessage(`Erreur : ${err.message}`, 'error'); }
+    finally { setLoadingAction(null); }
   };
 
   const handleScrapeResults = async () => {
+    setLoadingAction('results');
     try {
       const res = await fetch(`${API_BASE}/races/results`, {
         method: 'POST',
@@ -186,6 +192,7 @@ const AdminTab = ({
       if (data.success) { showMessage(data.message, 'success'); fetchAllData(); }
       else showMessage(data.error, 'error');
     } catch (err) { showMessage(`Erreur : ${err.message}`, 'error'); }
+    finally { setLoadingAction(null); }
   };
 
   return (
@@ -317,15 +324,30 @@ const AdminTab = ({
           <Calendar className="w-5 h-5" />
           Journées de courses
         </h3>
-        <button onClick={handleScrapeRaces} className="w-full bg-indigo-500 text-white p-2 rounded-md hover:bg-indigo-600 transition-colors text-sm">
-          Importer les courses (supertote.mu)
-        </button>
-        <button onClick={handleUpdateOdds} className="w-full bg-orange-500 text-white p-2 rounded-md hover:bg-orange-600 transition-colors text-sm">
-          Mettre à jour les côtes (smspariaz.com)
-        </button>
-        <button onClick={handleScrapeResults} className="w-full bg-green-600 text-white p-2 rounded-md hover:bg-green-700 transition-colors text-sm">
-          Récupérer les résultats (supertote.mu)
-        </button>
+        {[
+          { key: 'scrape',  label: 'Importer les courses',       sub: 'supertote.mu',   color: 'bg-indigo-500 hover:bg-indigo-600', handler: handleScrapeRaces },
+          { key: 'odds',    label: 'Mettre à jour les côtes',    sub: 'smspariaz.com',  color: 'bg-orange-500 hover:bg-orange-600', handler: handleUpdateOdds },
+          { key: 'results', label: 'Récupérer les résultats',    sub: 'supertote.mu',   color: 'bg-green-600 hover:bg-green-700',   handler: handleScrapeResults },
+        ].map(({ key, label, sub, color, handler }) => (
+          <button
+            key={key}
+            onClick={handler}
+            disabled={loadingAction !== null}
+            className={`w-full ${color} text-white p-2 rounded-md transition-colors text-sm flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed`}
+          >
+            {loadingAction === key ? (
+              <>
+                <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                </svg>
+                En cours…
+              </>
+            ) : (
+              <>{label} <span className="opacity-70 text-xs">({sub})</span></>
+            )}
+          </button>
+        ))}
       </div>
 
       {/* ── Scoring Config ── */}

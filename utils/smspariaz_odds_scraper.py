@@ -1,154 +1,114 @@
 """
-smspariaz.com odds scraper — fetches live Win odds for each race.
+smspariaz.com odds scraper — fetches live Win odds via the site's JSON API.
 
-Uses Selenium because smspariaz.com is JavaScript-rendered.
+The page https://www.smspariaz.com/local/ loads race data through jQuery
+from https://www.smspariaz.com/service/local_json.php, which returns plain
+JSON — no browser / Selenium required.
 
-XPath structure (provided by user):
-  Races container : /html/body/div[1]/div[3]/div[2]/div[2]
-  Race identity   : .../div[N]        (each child = one race header+rows block)
-  Horse/odds rows : .../div[N]/div[2] (second child of each race div)
+Response structure:
+    [
+      {
+        "races": [
+          {
+            "race": {"race_number": "1", "race_time": "12h30", "race_details": "..."},
+            "runners": [
+              {"horse_number": "1", "horse_name": "DIAMOND DAYS", "win": "450", ...},
+              ...
+            ]
+          },
+          ...
+        ]
+      }
+    ]
+
+Win odds are centesimal integers (e.g. "450" → 4.50 decimal).
 
 Returns:
     {race_number (int): {horse_number (int): win_odds (float)}}
     Empty dict on failure.
 """
 
-import re
-import time
 import logging
-
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, NoSuchElementException
-from webdriver_manager.chrome import ChromeDriverManager
+import requests
 
 logger = logging.getLogger(__name__)
 
-BASE_URL = "https://www.smspariaz.com/local/"
-RACES_CONTAINER_XPATH = "/html/body/div[1]/div[3]/div[2]/div[2]"
-_ODDS_DIVISOR = 100.0
-
-
-def _make_driver() -> webdriver.Chrome:
-    """Create a headless Chrome WebDriver."""
-    options = Options()
-    options.add_argument("--headless=new")
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-dev-shm-usage")
-    options.add_argument("--disable-gpu")
-    options.add_argument("--window-size=1920,1080")
-    options.add_argument(
-        "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+_API_URL = "https://www.smspariaz.com/service/local_json.php"
+_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
         "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-    )
-    options.add_argument("--disable-blink-features=AutomationControlled")
-    options.add_experimental_option("excludeSwitches", ["enable-automation"])
-    options.add_experimental_option("useAutomationExtension", False)
-    service = Service(ChromeDriverManager().install())
-    driver = webdriver.Chrome(service=service, options=options)
-    driver.execute_script(
-        "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
-    )
-    return driver
-
-
-def _parse_odds(text: str) -> float:
-    """Parse centesimal odds text (e.g. '310') into decimal odds (3.10)."""
-    numeric = re.sub(r"[^\d.]", "", text.strip())
-    if not numeric:
-        return 0.0
-    try:
-        return round(float(numeric) / _ODDS_DIVISOR, 2)
-    except ValueError:
-        return 0.0
+    ),
+    "Referer": "https://www.smspariaz.com/local/",
+    "Accept": "application/json, text/javascript, */*",
+}
+_ODDS_DIVISOR = 100.0
 
 
 def scrape_odds_from_smspariaz() -> dict:
     """
-    Scrape live Win odds from smspariaz.com/local/.
+    Fetch live Win odds from smspariaz.com's JSON API.
 
     Returns:
         {race_number (int): {horse_number (int): win_odds (float)}}
         Empty dict on failure.
     """
-    driver = None
-    result: dict[int, dict[int, float]] = {}
+    logger.info("Fetching odds from %s", _API_URL)
+    try:
+        response = requests.get(_API_URL, headers=_HEADERS, timeout=15)
+        response.raise_for_status()
+    except requests.RequestException as exc:
+        logger.error("Request failed: %s", exc)
+        return {}
 
     try:
-        driver = _make_driver()
-        logger.info("Loading %s", BASE_URL)
-        driver.get(BASE_URL)
+        payload = response.json()
+    except ValueError as exc:
+        logger.error("JSON parse error: %s", exc)
+        return {}
 
-        # Wait for the races container to be present
-        wait = WebDriverWait(driver, 20)
+    if not payload or not isinstance(payload, list):
+        logger.warning("Unexpected payload format: %r", payload)
+        return {}
+
+    races_list = payload[0].get("races", [])
+    if not races_list:
+        logger.warning("No races in API response")
+        return {}
+
+    result: dict[int, dict[int, float]] = {}
+
+    for entry in races_list:
+        race_info = entry.get("race", {})
         try:
-            wait.until(EC.presence_of_element_located((By.XPATH, RACES_CONTAINER_XPATH)))
-        except TimeoutException:
-            logger.warning("Races container not found within timeout — attempting anyway")
+            race_number = int(race_info.get("race_number", 0))
+        except (ValueError, TypeError):
+            continue
+        if race_number == 0:
+            continue
 
-        time.sleep(2)  # Let any late JS settle
+        result[race_number] = {}
 
-        container = driver.find_element(By.XPATH, RACES_CONTAINER_XPATH)
-        race_divs = container.find_elements(By.XPATH, "./div")
-        logger.info("Found %d top-level divs in races container", len(race_divs))
-
-        for div in race_divs:
-            # Identify race number from data-id attribute (e.g. "R1") or inner text
-            data_id = div.get_attribute("data-id") or ""
-            m = re.search(r"R(\d+)", data_id, re.IGNORECASE)
-            if not m:
-                first_line = (div.text or "").split("\n")[0]
-                m = re.search(r"R(\d+)", first_line, re.IGNORECASE)
-            if not m:
-                continue  # not a race div
-
-            race_number = int(m.group(1))
-            result[race_number] = {}
-
-            # Horse rows are in div[2] child of the race div
+        for runner in entry.get("runners", []):
             try:
-                rows_container = div.find_element(By.XPATH, "./div[2]")
-            except NoSuchElementException:
-                logger.warning("Race %d: no horse rows container (div[2])", race_number)
+                horse_number = int(runner.get("horse_number", 0))
+            except (ValueError, TypeError):
+                continue
+            if horse_number == 0:
                 continue
 
-            horse_rows = rows_container.find_elements(By.XPATH, "./div")
-            for row in horse_rows:
-                # Horse number
-                try:
-                    num_el = row.find_element(By.CSS_SELECTOR, "div.number")
-                    horse_number = int(num_el.text.strip())
-                except (NoSuchElementException, ValueError):
-                    continue
+            try:
+                win_raw = runner.get("win", 0)
+                win_odds = round(float(win_raw) / _ODDS_DIVISOR, 2)
+            except (ValueError, TypeError):
+                win_odds = 0.0
 
-                # Win odds — first div.odds element
-                try:
-                    odds_el = row.find_element(By.CSS_SELECTOR, "div.odds")
-                    odds = _parse_odds(odds_el.text)
-                except NoSuchElementException:
-                    odds = 0.0
+            if win_odds > 0:
+                result[race_number][horse_number] = win_odds
 
-                if odds > 0:
-                    result[race_number][horse_number] = odds
-
-            logger.info(
-                "Race %d: %d horse(s) with odds", race_number, len(result[race_number])
-            )
-
-    except NoSuchElementException:
-        logger.error("Races container not found via XPath: %s", RACES_CONTAINER_XPATH)
-        return {}
-    except Exception as exc:
-        logger.error("Error scraping smspariaz: %s", exc)
-        return {}
-    finally:
-        if driver:
-            driver.quit()
-            logger.info("WebDriver closed")
+        logger.info(
+            "Race %d: %d horse(s) with odds", race_number, len(result[race_number])
+        )
 
     total = sum(len(v) for v in result.values())
     logger.info("Done — %d race(s), %d horse(s) with odds", len(result), total)
