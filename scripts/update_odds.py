@@ -60,7 +60,10 @@ def run(date_str: str | None = None) -> None:
 
     with app.app_context():
         if date_str is None:
-            date_str = datetime.now(MUT).strftime("%Y-%m-%d")
+            from models import Race as RaceModel
+            today = datetime.now(MUT).strftime("%Y-%m-%d")
+            next_race = RaceModel.query.filter(RaceModel.date >= today).order_by(RaceModel.date).first()
+            date_str = next_race.date if next_race else today
 
         day_data = data_service.get_race_day_data(date_str)
         races = day_data.get("races", [])

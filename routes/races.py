@@ -139,7 +139,13 @@ def update_odds():
     """Scrapes live Win odds from smspariaz.com and updates the current race day."""
     try:
         from utils.smspariaz_odds_scraper import scrape_odds_from_smspariaz
-        date_str = _json().get('date') or datetime.now().strftime('%Y-%m-%d')
+        from models import Race as RaceModel
+        date_str = _json().get('date')
+        if not date_str:
+            today = datetime.now().strftime('%Y-%m-%d')
+            next_race = RaceModel.query.filter(RaceModel.date >= today).order_by(RaceModel.date).first()
+            date_str = next_race.date if next_race else today
+        print(f"[INFO] update-odds: targeting race day {date_str}")
         odds_data = scrape_odds_from_smspariaz()
         if not odds_data:
             return jsonify({"success": False, "error": "Aucune côte trouvée sur smspariaz.com"}), 200
