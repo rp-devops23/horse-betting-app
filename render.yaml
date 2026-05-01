@@ -11,6 +11,10 @@ services:
         value: production
       - key: FLASK_DEBUG
         value: false
+      - key: DATABASE_URL
+        fromDatabase:
+          name: horse-betting-db
+          property: connectionString
 
   # ── Race card scraping (supertote.mu — requests only, no browser needed) ──────
 
@@ -26,6 +30,10 @@ services:
     envVars:
       - key: FLASK_ENV
         value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: horse-betting-db
+          property: connectionString
 
   # Sat+Sun 08:00 MUT (UTC+4) = 04:00 UTC — morning fallback check
   - type: cron
@@ -39,11 +47,14 @@ services:
     envVars:
       - key: FLASK_ENV
         value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: horse-betting-db
+          property: connectionString
 
-  # ── Odds update (smspariaz.com — requires Chrome/Chromium) ───────────────────
+  # ── Odds update (smspariaz.com — JSON API, no browser needed) ────────────────
   # Runs Sat+Sun every hour from 08:00–12:00 MUT (04:00–08:00 UTC).
   # The script is a no-op once the first race has started.
-
   - type: cron
     name: update-odds
     env: python
@@ -55,3 +66,13 @@ services:
     envVars:
       - key: FLASK_ENV
         value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: horse-betting-db
+          property: connectionString
+
+databases:
+  - name: horse-betting-db
+    databaseName: horse_betting
+    user: horse_betting_user
+    plan: free
