@@ -15,7 +15,7 @@ def get_races():
 def scrape_races():
     """Scrapes races for a new race day and sets it as current."""
     try:
-        date_str = (request.json or {}).get('date')  # optional: "YYYY-MM-DD"
+        date_str = (request.get_json(silent=True) or {}).get('date')  # optional: "YYYY-MM-DD"
         current_day = data_service.scrape_new_races(date_str)
         data_service.save_current_race_day_data(current_day)
         n = len(current_day.get('races', []))
@@ -152,7 +152,7 @@ def update_odds():
 def scrape_results():
     """Scrapes results from supertote.mu and applies them to the DB."""
     try:
-        date_str = (request.json or {}).get('date')  # optional: "YYYY-MM-DD"
+        date_str = (request.get_json(silent=True) or {}).get('date')  # optional: "YYYY-MM-DD"
         data = data_service.scrape_race_results(date_str)
         n = data.get('count', 0)
         return jsonify({"success": True, "message": f"{n} résultat(s) importé(s) pour le {data.get('date')}.", "data": data}), 200
