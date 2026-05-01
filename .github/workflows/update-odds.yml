@@ -1,0 +1,33 @@
+name: Update Odds
+
+on:
+  schedule:
+    # Sat+Sun every hour from 08:00–12:00 MUT (UTC+4) = 04:00–08:00 UTC
+    - cron: "0 4 * * 6,0"
+    - cron: "0 5 * * 6,0"
+    - cron: "0 6 * * 6,0"
+    - cron: "0 7 * * 6,0"
+    - cron: "0 8 * * 6,0"
+  workflow_dispatch: # allow manual trigger from GitHub UI
+
+jobs:
+  update-odds:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wake up Render server
+        run: |
+          echo "Pinging server to wake it up..."
+          curl --silent --max-time 60 ${{ secrets.BACKEND_URL }}/api/users || true
+          sleep 5
+
+      - name: Update odds from smspariaz.com
+        run: |
+          echo "Triggering odds update..."
+          curl --fail --silent --show-error \
+            --request POST \
+            --header "Content-Type: application/json" \
+            --max-time 60 \
+            "${{ secrets.BACKEND_URL }}/api/races/update-odds" \
+            | tee /tmp/response.json
+          echo ""
+          cat /tmp/response.json
