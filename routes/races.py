@@ -160,10 +160,20 @@ def update_odds():
 def scrape_results():
     """Scrapes results from supertote.mu and applies them to the DB."""
     try:
-        date_str = _json().get('date')  # optional: "YYYY-MM-DD"
+        from models import Race as RaceModel
+        date_str = _json().get('date')
+        if not date_str:
+            today = datetime.now().strftime('%Y-%m-%d')
+            # Find most recent race day on/before today that still has races without a winner
+            race = RaceModel.query.filter(
+                RaceModel.date <= today,
+                RaceModel.winner_horse_number == None
+            ).order_by(RaceModel.date.desc()).first()
+            date_str = race.date if race else today
+        print(f"[INFO] /races/results: targeting race day {date_str}")
         data = data_service.scrape_race_results(date_str)
         n = data.get('count', 0)
-        return jsonify({"success": True, "message": f"{n} résultat(s) importé(s) pour le {data.get('date')}.", "data": data}), 200
+        return jsonify({"success": True, "message": f"{n} résultat(s) importé(s) pour le {data.get('date')}.", "date": date_str, "data": data}), 200
     except Exception as e:
         print(f"[ERROR] /races/results: {e}")
         return jsonify({"success": False, "error": str(e)}), 500

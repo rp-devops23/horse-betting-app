@@ -1,0 +1,72 @@
+name: Scrape Results
+
+# Mauritius races run Sat+Sun, first race ~12:30 MUT, last ~17:00 MUT.
+# MUT = UTC+4, so race window = 08:30–17:00 UTC+4 = 04:30–13:00 UTC.
+#
+# Strategy:
+#   1. Every 30 min from 30min after first race until end of day
+#      → 09:00–14:00 UTC on Sat+Sun  (= 13:00–18:00 MUT)
+#   2. Next-morning fallback in case results were published late
+#      → 04:00 UTC on Sun+Mon        (= 08:00 MUT)
+#
+# The backend auto-detects the most recent race day with missing results,
+# so all runs are safe no-ops if everything is already set.
+
+on:
+  schedule:
+    # Every 30 min 13:00–18:00 MUT (09:00–14:00 UTC) on Sat+Sun
+    - cron: "0,30 9-13 * * 6,0"
+    # 18:00 MUT end-of-day run
+    - cron: "0 14 * * 6,0"
+    # Next-morning fallback: Sun 08:00 MUT (for Sat races) + Mon 08:00 MUT (for Sun races)
+    - cron: "0 4 * * 0,1"
+
+  workflow_dispatch:
+    inputs:
+      date:
+        description: "Race date to scrape (YYYY-MM-DD). Leave empty to auto-detect."
+        required: false
+        default: ""
+
+jobs:
+  scrape-results:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wake up Render server
+        run: |
+          echo "Pinging server..."
+          curl --silent --max-time 60 "${{ secrets.BACKEND_URL }}/api/users" || true
+          sleep 5
+
+      - name: Scrape race results from supertote.mu
+        run: |
+          DATE_PARAM=""
+          if [ -n "${{ github.event.inputs.date }}" ]; then
+            DATE_PARAM="--data '{\"date\":\"${{ github.event.inputs.date }}\"}'"
+          fi
+
+          echo "Triggering results scrape${DATE_PARAM:+ for ${{ github.event.inputs.date }}}..."
+
+          curl --fail --silent --show-error \
+            --request POST \
+            --header "Content-Type: application/json" \
+            --max-time 120 \
+            ${DATE_PARAM} \
+            "${{ secrets.BACKEND_URL }}/api/races/results" \
+            | tee /tmp/response.json
+
+          echo ""
+          echo "=== Response ==="
+          cat /tmp/response.json
+
+          # Exit with error if success=false
+          python3 -c "
+          import json, sys
+          r = json.load(open('/tmp/response.json'))
+          if not r.get('success'):
+              print('ERROR:', r.get('error', 'unknown'))
+              sys.exit(1)
+          n = r.get('data', {}).get('count', 0)
+          d = r.get('date', '?')
+          print(f'OK — {n} result(s) applied for {d}')
+          "
