@@ -6,6 +6,7 @@ import API_BASE from '../config';
 const LeaderboardTab = ({ users, showMessage }) => {
   const [leaderboardData, setLeaderboardData] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [sortBy, setSortBy] = useState('score'); // 'score' | 'wins'
 
   // Helper to get user name from user ID
   const getUserName = (userId) => {
@@ -71,16 +72,34 @@ const LeaderboardTab = ({ users, showMessage }) => {
   return (
     <div className="space-y-6">
       <div className="bg-white p-6 rounded-lg shadow-md">
-        <h2 className="text-2xl font-bold mb-4 flex items-center gap-2 text-indigo-700">
-          <Trophy className="w-6 h-6" />
-          Overall Leaderboard
-        </h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-2xl font-bold flex items-center gap-2 text-indigo-700">
+            <Trophy className="w-6 h-6" />
+            Overall Leaderboard
+          </h2>
+          <div className="flex rounded-lg overflow-hidden border border-gray-200 text-sm">
+            <button
+              onClick={() => setSortBy('score')}
+              className={`px-3 py-1.5 transition-colors ${sortBy === 'score' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+            >
+              Points
+            </button>
+            <button
+              onClick={() => setSortBy('wins')}
+              className={`px-3 py-1.5 transition-colors ${sortBy === 'wins' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+            >
+              Victoires
+            </button>
+          </div>
+        </div>
         {loading ? (
           <SkeletonLeaderboard />
         ) : (
           <ul className="space-y-4">
             {Array.isArray(leaderboardData) && leaderboardData.length > 0 ? (
-              leaderboardData.map((entry, index) => (
+              [...leaderboardData]
+                .sort((a, b) => sortBy === 'wins' ? (b.wins ?? 0) - (a.wins ?? 0) : (b.totalScore || b.score || 0) - (a.totalScore || a.score || 0))
+                .map((entry, index) => (
                 <li key={index} className={`flex items-center p-4 rounded-xl shadow transition-all duration-300 transform hover:scale-105 ${
                   index === 0 ? 'bg-yellow-100' : index === 1 ? 'bg-gray-100' : index === 2 ? 'bg-amber-100' : 'bg-white'
                 }`}>
