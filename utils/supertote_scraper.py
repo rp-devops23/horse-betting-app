@@ -32,11 +32,6 @@ _HEADERS = {
     "Referer": BASE_URL,
 }
 
-# Supertote displays centesimal odds (e.g. 120 = 1.20, 1250 = 12.50).
-# Divide raw integer by 100 to get decimal odds, matching smspariaz convention.
-_ODDS_DIVISOR = 100.0
-
-
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
@@ -47,32 +42,6 @@ def _to_supertote_date(date_str: str) -> str:
     Example: '2026-04-25' → '25-apr-2026'
     """
     return datetime.strptime(date_str, "%Y-%m-%d").strftime("%d-%b-%Y").lower()
-
-
-def _calculate_points(odds: float) -> int:
-    """Map decimal odds to the app scoring tier (1 / 2 / 3 points)."""
-    if odds >= 10:
-        return 3
-    if odds >= 5:
-        return 2
-    return 1
-
-
-def _parse_odds(text: str) -> float:
-    """Parse a raw odds string from the page into a decimal float.
-
-    Supertote shows odds as integers (e.g. '120', 'Win 120').
-    Strip non-numeric characters then divide by _ODDS_DIVISOR.
-    Returns 0.0 if the value cannot be parsed.
-    """
-    numeric = re.sub(r"[^\d.]", "", text.strip())
-    if not numeric:
-        return 0.0
-    try:
-        raw = float(numeric)
-        return round(raw / _ODDS_DIVISOR, 2)
-    except ValueError:
-        return 0.0
 
 
 def _fetch(url: str, session: requests.Session) -> BeautifulSoup | None:
@@ -216,19 +185,13 @@ def _scrape_race_page(
             except (ValueError, AttributeError):
                 pass
 
-        # Win odds  (/browse/thoroughbred/-/wn/<horse_num>)
-        win_link = container.find("a", href=re.compile(r"/browse/thoroughbred/-/wn/"))
-        win_odds = _parse_odds(win_link.get_text(strip=True)) if win_link else 0.0
+        # Jockey — span with class "r-jockey"
+        jockey_tag = container.find("span", class_="r-jockey")
+        jockey = jockey_tag.get_text(strip=True) if jockey_tag else ""
 
-        # Place odds  (/browse/thoroughbred/-/pl/<horse_num>)
-        place_link = container.find("a", href=re.compile(r"/browse/thoroughbred/-/pl/"))
-        place_odds = _parse_odds(place_link.get_text(strip=True)) if place_link else 0.0
-
-        # Trainer & Jockey ─ page concatenates them as "K. RamsamyC. Hewitson".
-        # Extract all "Initial. Surname" tokens; last = jockey, second-to-last = trainer.
-        connection_tokens = re.findall(r"[A-Z]\.\s*[A-Za-z][A-Za-z\s'\-]+", full_text)
-        trainer = connection_tokens[-2].strip() if len(connection_tokens) >= 2 else ""
-        jockey = connection_tokens[-1].strip() if connection_tokens else ""
+        # Trainer — span with class "r-trainer"
+        trainer_tag = container.find("span", class_="r-trainer")
+        trainer = trainer_tag.get_text(strip=True) if trainer_tag else ""
 
         # Age
         age_m = re.search(r"\bAge\s+(\d+)\b", full_text, re.IGNORECASE)
@@ -242,6 +205,8 @@ def _scrape_race_page(
         form_m = re.search(r"\b(\d[\d\-]{3,})\b", full_text)
         form = form_m.group(1) if form_m else ""
 
+        # Odds are intentionally not scraped from supertote — smspariaz is the
+        # sole source of odds and will populate them separately.
         horses.append({
             "number": horse_number,
             "stall": stall_number,
@@ -251,9 +216,7 @@ def _scrape_race_page(
             "age": age,
             "weight_kg": weight_kg,
             "form": form,
-            "odds": win_odds,
-            "place_odds": place_odds,
-            "points": _calculate_points(win_odds),
+            "odds": 0.0,
         })
 
     horses.sort(key=lambda h: h["number"])
