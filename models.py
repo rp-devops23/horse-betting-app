@@ -68,3 +68,4 @@ class UserScore(db.Model):
     user_id = db.Column(db.String, db.ForeignKey('users.id'), nullable=False)
     race_date = db.Column(db.String, nullable=False)
     score = db.Column(db.Integer, default=0)
+    wins = db.Column(db.Integer, default=0)

@@ -96,8 +96,13 @@ const LeaderboardTab = ({ users, showMessage }) => {
                     </div>
                   </div>
                   <div className="text-right">
-                    <span className="font-bold text-xl text-indigo-600">{Math.round(entry.totalScore || entry.score || 0)}</span>
-                    <span className="text-sm text-gray-500 ml-1">pts</span>
+                    <div>
+                      <span className="font-bold text-xl text-indigo-600">{Math.round(entry.totalScore || entry.score || 0)}</span>
+                      <span className="text-sm text-gray-500 ml-1">pts</span>
+                    </div>
+                    <div className="text-sm text-gray-400">
+                      {entry.wins ?? 0} victoire{(entry.wins ?? 0) !== 1 ? 's' : ''}
+                    </div>
                   </div>
                 </li>
               ))

@@ -501,8 +501,9 @@ class DataService:
             user_score = UserScore.query.filter_by(user_id=user.id, race_date=current_date).first()
             if user_score:
                 user_score.score = total_score
+                user_score.wins = races_won
             else:
-                db.session.add(UserScore(id=str(uuid.uuid4()), user_id=user.id, race_date=current_date, score=total_score))
+                db.session.add(UserScore(id=str(uuid.uuid4()), user_id=user.id, race_date=current_date, score=total_score, wins=races_won))
 
             scores.append({"userId": user.id, "name": user.name, "score": total_score, "races_won": races_won})
 
@@ -553,8 +554,9 @@ class DataService:
             user_score = UserScore.query.filter_by(user_id=user.id, race_date=race_date).first()
             if user_score:
                 user_score.score = total_score
+                user_score.wins = races_won
             else:
-                db.session.add(UserScore(id=str(uuid.uuid4()), user_id=user.id, race_date=race_date, score=total_score))
+                db.session.add(UserScore(id=str(uuid.uuid4()), user_id=user.id, race_date=race_date, score=total_score, wins=races_won))
 
             scores.append({"userId": user.id, "name": user.name, "score": total_score, "races_won": races_won})
 
@@ -581,11 +583,13 @@ class DataService:
             # Get all user scores across all race days
             user_scores = UserScore.query.filter_by(user_id=user.id).all()
             total_score = sum(score.score for score in user_scores)
-            
+            total_wins = sum(score.wins or 0 for score in user_scores)
+
             total_scores.append({
                 "userId": user.id,
                 "name": user.name,
-                "score": total_score
+                "score": total_score,
+                "wins": total_wins,
             })
         
         # Sort by total score (descending)

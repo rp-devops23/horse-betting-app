@@ -28,3 +28,15 @@ jobs:
             | tee /tmp/response.json
           echo ""
           cat /tmp/response.json
+
+      - name: Update odds from smspariaz.com
+        run: |
+          echo "Triggering odds update..."
+          curl --fail --silent --show-error \
+            --request POST \
+            --header "Content-Type: application/json" \
+            --max-time 60 \
+            "${{ secrets.BACKEND_URL }}/api/races/update-odds" \
+            | tee /tmp/odds_response.json
+          echo ""
+          cat /tmp/odds_response.json
