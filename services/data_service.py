@@ -135,9 +135,15 @@ class DataService:
             for horse in Horse.query.filter_by(race_id=race.id).order_by(Horse.horse_number).all():
                 horses_data.append({
                     "number": horse.horse_number,
+                    "stall": horse.stall_number,
                     "name": horse.name,
                     "odds": horse.odds,
-                    "scratched": bool(horse.scratched)
+                    "scratched": bool(horse.scratched),
+                    "jockey": horse.jockey,
+                    "trainer": horse.trainer,
+                    "weight_kg": horse.weight_kg,
+                    "age": horse.age,
+                    "form": horse.form,
                 })
 
             bets_data = {bet.user_id: bet.horse_number for bet in Bet.query.filter_by(race_id=race.id).all()}
@@ -237,14 +243,26 @@ class DataService:
                         if existing_horse:
                             existing_horse.name = horse_data['name']
                             existing_horse.odds = horse_data['odds']
+                            existing_horse.stall_number = horse_data.get('stall')
+                            existing_horse.jockey = horse_data.get('jockey')
+                            existing_horse.trainer = horse_data.get('trainer')
+                            existing_horse.weight_kg = horse_data.get('weight_kg')
+                            existing_horse.age = horse_data.get('age')
+                            existing_horse.form = horse_data.get('form')
                             # Don't overwrite manually-set scratched status
                         else:
                             db.session.add(Horse(
                                 id=str(uuid.uuid4()),
                                 race_id=race_id,
                                 horse_number=horse_data['number'],
+                                stall_number=horse_data.get('stall'),
                                 name=horse_data['name'],
-                                odds=horse_data['odds']
+                                odds=horse_data['odds'],
+                                jockey=horse_data.get('jockey'),
+                                trainer=horse_data.get('trainer'),
+                                weight_kg=horse_data.get('weight_kg'),
+                                age=horse_data.get('age'),
+                                form=horse_data.get('form'),
                             ))
 
             db.session.commit()

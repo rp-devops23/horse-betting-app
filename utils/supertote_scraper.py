@@ -149,10 +149,11 @@ def _scrape_race_page(
         return None
 
     # ------------------------------------------------------------------
-    # Race time and name
+    # Race time, name, and distance
     # ------------------------------------------------------------------
     race_time = "TBD"
     race_name = f"Race {race_number}"
+    race_distance = None
 
     headings = soup.find_all(["h1", "h2", "h3", "h4"])
 
@@ -173,6 +174,12 @@ def _scrape_race_page(
     ]
     if title_headings:
         race_name = title_headings[0]
+
+    # Distance — look for a standalone "NNNNm" pattern anywhere on the page
+    page_text = soup.get_text(" ")
+    dist_m = re.search(r"\b(\d{3,5})\s*m\b", page_text)
+    if dist_m:
+        race_distance = f"{dist_m.group(1)}m"
 
     # ------------------------------------------------------------------
     # Horses — anchor tags whose href begins with /horse/
@@ -198,6 +205,15 @@ def _scrape_race_page(
                 horse_number = int(str(candidate).strip())
                 break
             except ValueError:
+                pass
+
+        # Stall number — span with class "r-lane"
+        stall_tag = container.find("span", class_="r-lane")
+        stall_number = None
+        if stall_tag:
+            try:
+                stall_number = int(stall_tag.get_text(strip=True))
+            except (ValueError, AttributeError):
                 pass
 
         # Win odds  (/browse/thoroughbred/-/wn/<horse_num>)
@@ -228,6 +244,7 @@ def _scrape_race_page(
 
         horses.append({
             "number": horse_number,
+            "stall": stall_number,
             "name": horse_name,
             "jockey": jockey,
             "trainer": trainer,
@@ -253,6 +270,7 @@ def _scrape_race_page(
         "id": race_id,
         "name": race_name,
         "time": race_time,
+        "distance": race_distance,
         "horses": horses,
         "winner": None,
         "status": "upcoming",

@@ -84,6 +84,12 @@ def apply_migrations(app):
                 conn.execute(text("ALTER TABLE races ADD COLUMN IF NOT EXISTS name VARCHAR"))
                 conn.execute(text("ALTER TABLE races ADD COLUMN IF NOT EXISTS time VARCHAR"))
                 conn.execute(text("ALTER TABLE races ADD COLUMN IF NOT EXISTS distance VARCHAR"))
+                conn.execute(text("ALTER TABLE horses ADD COLUMN IF NOT EXISTS stall_number INTEGER"))
+                conn.execute(text("ALTER TABLE horses ADD COLUMN IF NOT EXISTS jockey VARCHAR"))
+                conn.execute(text("ALTER TABLE horses ADD COLUMN IF NOT EXISTS trainer VARCHAR"))
+                conn.execute(text("ALTER TABLE horses ADD COLUMN IF NOT EXISTS weight_kg FLOAT"))
+                conn.execute(text("ALTER TABLE horses ADD COLUMN IF NOT EXISTS age INTEGER"))
+                conn.execute(text("ALTER TABLE horses ADD COLUMN IF NOT EXISTS form VARCHAR"))
                 conn.commit()
         except Exception as e:
             print(f"[Migration] {e}")

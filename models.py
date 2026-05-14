@@ -38,9 +38,15 @@ class Horse(db.Model):
     id = db.Column(db.String, primary_key=True)
     race_id = db.Column(db.String, db.ForeignKey('races.id'), nullable=False)
     horse_number = db.Column(db.Integer, nullable=False)
+    stall_number = db.Column(db.Integer, nullable=True)
     name = db.Column(db.String, nullable=False)
     odds = db.Column(db.Float, nullable=False)
     scratched = db.Column(db.Boolean, default=False)
+    jockey = db.Column(db.String, nullable=True)
+    trainer = db.Column(db.String, nullable=True)
+    weight_kg = db.Column(db.Float, nullable=True)
+    age = db.Column(db.Integer, nullable=True)
+    form = db.Column(db.String, nullable=True)
 
 class AppSetting(db.Model):
     __tablename__ = 'app_settings'
