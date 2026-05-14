@@ -118,6 +118,42 @@ def update_settings():
         return jsonify({"success": True})
     return jsonify({"error": "Failed to save settings"}), 500
 
+@admin_bp.route('/races/<race_id>/horses', methods=['GET'])
+def list_race_horses(race_id):
+    """Lists all horses and bets for a specific race (for debugging duplicate-horse issues)."""
+    from models import Race, Horse, Bet, User
+    race = Race.query.get(race_id)
+    if not race:
+        return jsonify({"error": "Race not found"}), 404
+    horses = Horse.query.filter_by(race_id=race_id).order_by(Horse.horse_number).all()
+    bets = Bet.query.filter_by(race_id=race_id).all()
+    users = {u.id: u.name for u in User.query.all()}
+    return jsonify({
+        "race_id": race_id,
+        "race_number": race.race_number,
+        "date": race.date,
+        "winner_horse_number": race.winner_horse_number,
+        "horses": [{"id": h.id, "number": h.horse_number, "name": h.name, "scratched": h.scratched} for h in horses],
+        "bets": [{"user": users.get(b.user_id, b.user_id), "horse_number": b.horse_number, "is_banker": b.is_banker} for b in bets],
+    })
+
+
+@admin_bp.route('/races/<race_id>/horses/<int:horse_number>', methods=['DELETE'])
+def delete_horse(race_id, horse_number):
+    """Deletes a specific horse record (use to remove duplicates created by re-scraping)."""
+    from models import Horse, Bet
+    from database import db
+    horse = Horse.query.filter_by(race_id=race_id, horse_number=horse_number).first()
+    if not horse:
+        return jsonify({"error": "Horse not found"}), 404
+    bet_count = Bet.query.filter_by(race_id=race_id, horse_number=horse_number).count()
+    if bet_count > 0:
+        return jsonify({"error": f"Cannot delete — {bet_count} bet(s) reference this horse number"}), 409
+    db.session.delete(horse)
+    db.session.commit()
+    return jsonify({"success": True, "message": f"Horse #{horse_number} deleted from race {race_id}"}), 200
+
+
 @admin_bp.route('/reset-data', methods=['POST'])
 def reset_all_data():
     """Delete all user data (bets, bankers, users)."""

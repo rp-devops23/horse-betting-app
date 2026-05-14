@@ -132,7 +132,7 @@ class DataService:
         races_data = []
         for race in races:
             horses_data = []
-            for horse in Horse.query.filter_by(race_id=race.id).all():
+            for horse in Horse.query.filter_by(race_id=race.id).order_by(Horse.horse_number).all():
                 horses_data.append({
                     "number": horse.horse_number,
                     "name": horse.name,
@@ -222,24 +222,30 @@ class DataService:
                     )
                     db.session.add(race_obj)
 
-                # Upsert horses — update odds/name if exists, create if not
-                # Bets are never touched
-                for horse_data in race_data.get('horses', []):
-                    existing_horse = Horse.query.filter_by(
-                        race_id=race_id, horse_number=horse_data['number']
-                    ).first()
-                    if existing_horse:
-                        existing_horse.name = horse_data['name']
-                        existing_horse.odds = horse_data['odds']
-                        # Don't overwrite manually-set scratched status
-                    else:
-                        db.session.add(Horse(
-                            id=str(uuid.uuid4()),
-                            race_id=race_id,
-                            horse_number=horse_data['number'],
-                            name=horse_data['name'],
-                            odds=horse_data['odds']
-                        ))
+                # Upsert horses — update odds/name if exists, create if not.
+                # Bets are never touched.
+                # Skip entirely for completed races: result pages on supertote show
+                # finishing positions as standalone numbers, which the parser mistakes
+                # for horse numbers. This corrupts names and zeros out odds for existing
+                # horses. Once a race has a winner, its horse data is final.
+                race_completed = existing_race and existing_race.winner_horse_number is not None
+                if not race_completed:
+                    for horse_data in race_data.get('horses', []):
+                        existing_horse = Horse.query.filter_by(
+                            race_id=race_id, horse_number=horse_data['number']
+                        ).first()
+                        if existing_horse:
+                            existing_horse.name = horse_data['name']
+                            existing_horse.odds = horse_data['odds']
+                            # Don't overwrite manually-set scratched status
+                        else:
+                            db.session.add(Horse(
+                                id=str(uuid.uuid4()),
+                                race_id=race_id,
+                                horse_number=horse_data['number'],
+                                name=horse_data['name'],
+                                odds=horse_data['odds']
+                            ))
 
             db.session.commit()
             return True
@@ -402,7 +408,13 @@ class DataService:
             return False
 
     def toggle_horse_scratch(self, race_id: str, horse_number: int) -> dict:
-        """Toggles a horse's scratched status; redirects affected bets to the favorite."""
+        """Toggles a horse's scratched status; redirects affected bets to the favorite.
+
+        WARNING: Un-scratching does NOT automatically restore redirected bets.
+        We can't know which bets on the favorite were redirected vs. placed
+        intentionally, so reverting is unsafe to do automatically.
+        If a horse is un-scratched by mistake, fix affected bets manually via SQL.
+        """
         try:
             horse = Horse.query.filter_by(race_id=race_id, horse_number=horse_number).first()
             if not horse:
