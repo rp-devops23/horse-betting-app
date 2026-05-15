@@ -386,19 +386,26 @@ const RaceDayTab = ({
                               : 'bg-white border border-gray-100'
                           }`}
                         >
-                          {/* Left: number circle + name/badges column */}
+                          {/* Left: number circle + stall */}
                           <div className="flex items-center gap-3 min-w-0 flex-1">
-                            <span className={`flex-shrink-0 font-bold w-8 h-8 rounded-full flex items-center justify-center text-sm ${
-                              isScratched ? 'bg-gray-200 text-gray-400' :
-                              wonBet ? 'bg-white text-green-600' :
-                              isWinner ? 'bg-yellow-400 text-yellow-900' :
-                              isLastHorse ? 'bg-red-200 text-red-700' :
-                              isMyBet ? 'bg-white text-indigo-600' :
-                              'bg-indigo-100 text-indigo-600'
-                            }`}>
-                              {horse.number}
-                            </span>
-                            <div className="min-w-0">
+                            <div className="flex-shrink-0 flex flex-col items-center gap-0.5">
+                              <span className={`font-bold w-8 h-8 rounded-full flex items-center justify-center text-sm ${
+                                isScratched ? 'bg-gray-200 text-gray-400' :
+                                wonBet ? 'bg-white text-green-600' :
+                                isWinner ? 'bg-yellow-400 text-yellow-900' :
+                                isLastHorse ? 'bg-red-200 text-red-700' :
+                                isMyBet ? 'bg-white text-indigo-600' :
+                                'bg-indigo-100 text-indigo-600'
+                              }`}>
+                                {horse.number}
+                              </span>
+                              {horse.stall != null && (
+                                <span className={`text-[10px] leading-none ${wonBet || isMyBet ? 'text-indigo-200' : 'text-gray-400'}`}>
+                                  {horse.stall}
+                                </span>
+                              )}
+                            </div>
+                            <div className="min-w-0 flex-1">
                               {/* Name row */}
                               <div className="flex items-center gap-1.5">
                                 <span className={`font-medium truncate ${
@@ -414,7 +421,23 @@ const RaceDayTab = ({
                                 {isWinner && !isMyBet && <Trophy className="w-3.5 h-3.5 flex-shrink-0 text-yellow-600" />}
                                 {isLastHorse && !isScratched && <Flag className="w-3 h-3 flex-shrink-0 text-red-500" title="Dernier" />}
                               </div>
-                              {/* Pickers row — below the name */}
+                              {/* Details row: age, weight, form */}
+                              {(horse.age || horse.weight_kg || horse.form) && (
+                                <div className={`flex flex-wrap gap-x-2 text-xs mt-0.5 ${wonBet || isMyBet ? 'text-indigo-200' : isWinner ? 'text-yellow-700' : 'text-gray-400'}`}>
+                                  {horse.age && <span>{horse.age}a</span>}
+                                  {horse.weight_kg && <span>{horse.weight_kg}kg</span>}
+                                  {horse.form && <span className="font-mono">{horse.form}</span>}
+                                </div>
+                              )}
+                              {/* Jockey / Trainer */}
+                              {(horse.jockey || horse.trainer) && (
+                                <div className={`text-xs mt-0.5 ${wonBet || isMyBet ? 'text-indigo-200' : isWinner ? 'text-yellow-700' : 'text-gray-400'}`}>
+                                  {horse.jockey && <span>🏇 {horse.jockey}</span>}
+                                  {horse.jockey && horse.trainer && <span className="mx-1">·</span>}
+                                  {horse.trainer && <span>🏠 {horse.trainer}</span>}
+                                </div>
+                              )}
+                              {/* Pickers row */}
                               {pickers.length > 0 && (
                                 <div className="flex flex-wrap gap-1 mt-1">
                                   {pickers.map(u => {
