@@ -72,21 +72,21 @@ const LeaderboardTab = ({ users, showMessage }) => {
   return (
     <div className="space-y-6">
       <div className="bg-white p-6 rounded-lg shadow-md">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-2xl font-bold flex items-center gap-2 text-indigo-700">
+        <div className="mb-4">
+          <h2 className="text-2xl font-bold flex items-center gap-2 text-indigo-700 mb-3">
             <Trophy className="w-6 h-6" />
             Overall Leaderboard
           </h2>
-          <div className="flex rounded-lg overflow-hidden border border-gray-200 text-sm">
+          <div className="flex rounded-lg overflow-hidden border border-gray-200 text-sm w-fit">
             <button
               onClick={() => setSortBy('score')}
-              className={`px-3 py-1.5 transition-colors ${sortBy === 'score' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+              className={`px-4 py-1.5 transition-colors ${sortBy === 'score' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
             >
               Points
             </button>
             <button
               onClick={() => setSortBy('wins')}
-              className={`px-3 py-1.5 transition-colors ${sortBy === 'wins' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+              className={`px-4 py-1.5 transition-colors ${sortBy === 'wins' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
             >
               Victoires
             </button>
@@ -115,13 +115,27 @@ const LeaderboardTab = ({ users, showMessage }) => {
                     </div>
                   </div>
                   <div className="text-right">
-                    <div>
-                      <span className="font-bold text-xl text-indigo-600">{Math.round(entry.totalScore || entry.score || 0)}</span>
-                      <span className="text-sm text-gray-500 ml-1">pts</span>
-                    </div>
-                    <div className="text-sm text-gray-400">
-                      {entry.wins ?? 0} victoire{(entry.wins ?? 0) !== 1 ? 's' : ''}
-                    </div>
+                    {sortBy === 'wins' ? (
+                      <>
+                        <div>
+                          <span className="font-bold text-2xl text-indigo-600">{entry.wins ?? 0}</span>
+                          <span className="text-sm text-gray-500 ml-1">victoire{(entry.wins ?? 0) !== 1 ? 's' : ''}</span>
+                        </div>
+                        <div className="text-sm text-gray-400">
+                          {Math.round(entry.totalScore || entry.score || 0)} pts
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div>
+                          <span className="font-bold text-2xl text-indigo-600">{Math.round(entry.totalScore || entry.score || 0)}</span>
+                          <span className="text-sm text-gray-500 ml-1">pts</span>
+                        </div>
+                        <div className="text-sm text-gray-400">
+                          {entry.wins ?? 0} victoire{(entry.wins ?? 0) !== 1 ? 's' : ''}
+                        </div>
+                      </>
+                    )}
                   </div>
                 </li>
               ))
