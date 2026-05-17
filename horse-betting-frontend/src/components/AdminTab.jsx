@@ -14,7 +14,8 @@ const AdminTab = ({
   const [usersWithPins, setUsersWithPins] = useState([]);
   const [showPins, setShowPins] = useState({}); // { userId: true/false }
   const [restoring, setRestoring] = useState(false);
-  const [loadingAction, setLoadingAction] = useState(null); // 'scrape' | 'odds' | 'results'
+  const [loadingAction, setLoadingAction] = useState(null); // 'scrape' | 'odds' | 'results' | 'refresh'
+  const [refreshDate, setRefreshDate] = useState(() => new Date().toISOString().slice(0, 10));
   const restoreInputRef = useRef(null);
 
   // Scoring config state
@@ -195,6 +196,21 @@ const AdminTab = ({
     finally { setLoadingAction(null); }
   };
 
+  const handleRefreshScores = async () => {
+    setLoadingAction('refresh');
+    try {
+      const res = await fetch(`${API_BASE}/races/refresh-scores`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ race_date: refreshDate }),
+      });
+      const data = await res.json();
+      if (data.success) { showMessage(data.message, 'success'); fetchAllData(); }
+      else showMessage(data.error || 'Erreur inconnue', 'error');
+    } catch (err) { showMessage(`Erreur : ${err.message}`, 'error'); }
+    finally { setLoadingAction(null); }
+  };
+
   return (
     <div className="bg-white p-6 rounded-b-lg shadow-lg space-y-6">
 
@@ -348,6 +364,33 @@ const AdminTab = ({
             )}
           </button>
         ))}
+
+        {/* Refresh scores */}
+        <div className="flex gap-2 items-center">
+          <input
+            type="date"
+            value={refreshDate}
+            onChange={e => setRefreshDate(e.target.value)}
+            className="flex-1 p-2 border rounded-md text-sm bg-white"
+          />
+          <button
+            onClick={handleRefreshScores}
+            disabled={loadingAction !== null}
+            className="flex-1 bg-purple-600 hover:bg-purple-700 text-white p-2 rounded-md transition-colors text-sm flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {loadingAction === 'refresh' ? (
+              <>
+                <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                </svg>
+                En cours…
+              </>
+            ) : (
+              'Recalculer les scores'
+            )}
+          </button>
+        </div>
       </div>
 
       {/* ── Scoring Config ── */}

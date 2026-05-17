@@ -324,17 +324,20 @@ class DataService:
             
     # --- Betting Management ---
 
-    def place_bet(self, user_id: str, race_id: str, horse_number: int, is_banker: bool) -> bool:
-        """Places a bet for a user on a specific horse in a race."""
+    def place_bet(self, user_id: str, race_id: str, horse_number: int, is_banker: bool, force: bool = False) -> bool:
+        """Places a bet for a user on a specific horse in a race.
+
+        force=True bypasses the completed-race check (admin override only).
+        """
         try:
             # Check if user and race exist
             user_exists = User.query.get(user_id) is not None
             race = Race.query.get(race_id)
             if not user_exists or not race:
                 return False
-            
-            # Check if race is completed - no betting allowed on completed races
-            if race.status == 'completed':
+
+            # Check if race is completed - no betting allowed unless admin forces it
+            if race.status == 'completed' and not force:
                 return False
 
             # If setting as banker, remove any existing banker for this user on the same race date

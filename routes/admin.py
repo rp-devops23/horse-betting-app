@@ -154,6 +154,21 @@ def delete_horse(race_id, horse_number):
     return jsonify({"success": True, "message": f"Horse #{horse_number} deleted from race {race_id}"}), 200
 
 
+@admin_bp.route('/banker', methods=['POST'])
+def admin_set_banker():
+    """Force-set a banker for any user on any race, bypassing the completed-race restriction."""
+    data = request.get_json(force=True) or {}
+    user_id = data.get('userId')
+    race_id = data.get('raceId')
+    horse_number = data.get('horseNumber')
+    if not all([user_id, race_id, horse_number]):
+        return jsonify({"error": "userId, raceId and horseNumber are required"}), 400
+    success = data_service.place_bet(user_id, race_id, int(horse_number), is_banker=True, force=True)
+    if success:
+        return jsonify({"success": True}), 200
+    return jsonify({"success": False, "error": "Failed to set banker"}), 500
+
+
 @admin_bp.route('/reset-data', methods=['POST'])
 def reset_all_data():
     """Delete all user data (bets, bankers, users)."""

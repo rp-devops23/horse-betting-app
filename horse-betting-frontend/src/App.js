@@ -304,7 +304,10 @@ const HorseBettingApp = () => {
       
       if (currentBet) {
         // If there's already a bet, make it a banker bet
-        const response = await fetch(`${API_BASE}/banker`, {
+        const race = races.find(r => r.id === raceId);
+        const useAdminEndpoint = isAdminAuthenticated && race?.status === 'completed';
+        const endpoint = useAdminEndpoint ? `${API_BASE}/admin/banker` : `${API_BASE}/banker`;
+        const response = await fetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ userId: String(selectedUserId), raceId, horseNumber: currentBet.horse })
@@ -333,7 +336,7 @@ const HorseBettingApp = () => {
     } catch (error) {
       showMessage(`Error setting banker: ${error.message}`, 'error');
     }
-  }, [selectedUserId, bets, setBets, setBankers, showMessage, selectedRaceDay]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selectedUserId, bets, setBets, setBankers, showMessage, selectedRaceDay, races, isAdminAuthenticated]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     fetchAllData();
