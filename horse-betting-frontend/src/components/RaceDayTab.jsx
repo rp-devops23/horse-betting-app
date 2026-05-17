@@ -193,12 +193,12 @@ const RaceDayTab = ({
               const numB = parseInt((b.id.match(/R(\d+)/i) || [])[1] || 99);
               return numA - numB;
             })[0];
-            const bankerLocked = firstRace ? isRaceTimeLocked(firstRace.time, selectedRaceDay) : false;
+            const bankerLocked = !isAdmin && (firstRace ? isRaceTimeLocked(firstRace.time, selectedRaceDay) : false);
             return races.map(race => {
             const myBet = bets?.find(b => String(b.userId) === String(selectedUserId) && b.raceId === race.id);
             const isBanker = bankers && selectedUserId && bankers[String(selectedUserId)] === race.id;
             const timeLocked = isRaceTimeLocked(race.time, selectedRaceDay);
-            const canBet = !!selectedUserId && race.status !== 'completed' && !timeLocked;
+            const canBet = !!selectedUserId && race.status !== 'completed' && (!timeLocked || isAdmin);
 
             return (
               <div key={race.id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
