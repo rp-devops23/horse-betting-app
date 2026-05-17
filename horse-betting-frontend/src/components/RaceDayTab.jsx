@@ -468,7 +468,7 @@ const RaceDayTab = ({
                         </button>
 
                         {/* Admin scratch toggle */}
-                        {isAdmin && race.status !== 'completed' && (
+                        {isAdmin && (
                           <button
                             onClick={() => handleToggleScratch(race.id, horse.number)}
                             className={`absolute top-2 right-2 text-xs px-1.5 py-0.5 rounded transition-colors ${
