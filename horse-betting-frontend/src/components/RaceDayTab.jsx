@@ -412,8 +412,8 @@ const RaceDayTab = ({
                             )}
                             {(horse.jockey || horse.trainer) && (
                               <div className={`text-xs mt-0.5 flex flex-wrap gap-x-3 ${detailColor}`}>
-                                {horse.jockey && <span>J. {horse.jockey}</span>}
-                                {horse.trainer && <span>E. {horse.trainer}</span>}
+                                {horse.jockey && <span>{horse.jockey}</span>}
+                                {horse.trainer && <span>{horse.trainer}</span>}
                               </div>
                             )}
                             {pickers.length > 0 && (
