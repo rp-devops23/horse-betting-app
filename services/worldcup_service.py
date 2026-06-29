@@ -83,13 +83,13 @@ class WorldCupService:
             logger.error(f"[WC] update_match_teams error: {e}")
             return False
 
-    def enter_result(self, match_id, score_a, score_b, penalty_winner=None):
+    def enter_result(self, match_id, score_a, score_b, penalty_winner=None, require_penalty=True):
         """Admin enters final score. Scores bets and propagates winner."""
         try:
             match = WCMatch.query.get(match_id)
             if not match:
                 return False, "Match not found"
-            if score_a == score_b and not penalty_winner:
+            if score_a == score_b and not penalty_winner and require_penalty:
                 return False, "Draw in knockout: penalty_winner ('a' or 'b') is required"
             match.score_a = score_a
             match.score_b = score_b
@@ -118,7 +118,8 @@ class WorldCupService:
             return False, "Match has already started"
         if not match.team_a or not match.team_b:
             return False, "Teams not yet determined"
-        if predicted_a == predicted_b and not predicted_pen_winner:
+        pen = predicted_pen_winner if predicted_a == predicted_b else None
+        if predicted_a == predicted_b and not pen:
             return False, "Draw predicted: choose a penalty winner (penaltyWinner: 'a' or 'b')"
 
         try:
@@ -126,7 +127,7 @@ class WorldCupService:
             if existing:
                 existing.predicted_a = predicted_a
                 existing.predicted_b = predicted_b
-                existing.predicted_pen_winner = predicted_pen_winner if predicted_a == predicted_b else None
+                existing.predicted_pen_winner = pen
                 existing.points_awarded = None
             else:
                 bet = WCBet(
@@ -135,7 +136,7 @@ class WorldCupService:
                     match_id=match_id,
                     predicted_a=predicted_a,
                     predicted_b=predicted_b,
-                    predicted_pen_winner=predicted_pen_winner if predicted_a == predicted_b else None,
+                    predicted_pen_winner=pen,
                 )
                 db.session.add(bet)
             db.session.commit()
