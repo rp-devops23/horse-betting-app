@@ -146,6 +146,43 @@ class WorldCupService:
             'points_awarded': b.points_awarded,
         } for b in bets}
 
+    def get_match_predictions(self, match_id):
+        """Get all predictions for a completed match (for post-match comparison)."""
+        from models import User
+        match = WCMatch.query.get(match_id)
+        if not match or match.status != 'completed':
+            return []
+        bets = WCBet.query.filter_by(match_id=match_id).all()
+        users = {u.id: u.name for u in User.query.all()}
+        return [{
+            'userId': b.user_id,
+            'name': users.get(b.user_id, b.user_id),
+            'predicted_a': b.predicted_a,
+            'predicted_b': b.predicted_b,
+            'points_awarded': b.points_awarded,
+        } for b in sorted(bets, key=lambda x: -(x.points_awarded or 0))]
+
+    def get_all_predictions(self):
+        """Get all predictions grouped by match (only for completed matches)."""
+        from models import User
+        completed_ids = [m.id for m in WCMatch.query.filter_by(status='completed').all()]
+        if not completed_ids:
+            return {}
+        bets = WCBet.query.filter(WCBet.match_id.in_(completed_ids)).all()
+        users = {u.id: u.name for u in User.query.all()}
+        result = {}
+        for b in bets:
+            result.setdefault(b.match_id, []).append({
+                'userId': b.user_id,
+                'name': users.get(b.user_id, b.user_id),
+                'predicted_a': b.predicted_a,
+                'predicted_b': b.predicted_b,
+                'points_awarded': b.points_awarded,
+            })
+        for mid in result:
+            result[mid].sort(key=lambda x: -(x['points_awarded'] or 0))
+        return result
+
     # --- Leaderboard ---
 
     def get_leaderboard(self):

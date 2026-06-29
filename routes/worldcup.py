@@ -82,6 +82,16 @@ def get_leaderboard():
     return jsonify(wc_service.get_leaderboard())
 
 
+@worldcup_bp.route('/matches/<match_id>/predictions', methods=['GET'])
+def get_match_predictions(match_id):
+    return jsonify(wc_service.get_match_predictions(match_id))
+
+
+@worldcup_bp.route('/all-predictions', methods=['GET'])
+def get_all_predictions():
+    return jsonify(wc_service.get_all_predictions())
+
+
 @worldcup_bp.route('/fetch', methods=['POST'])
 def fetch_from_espn():
     """Fetch matches from ESPN API and seed/update the database."""
