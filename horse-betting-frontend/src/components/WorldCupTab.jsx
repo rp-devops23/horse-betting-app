@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import API_BASE from '../config';
 import { getUserColour, initials } from '../utils/userColors';
 
@@ -136,6 +136,70 @@ function BracketPair({ topChild, bottomChild, matchCard, side }) {
   return (
     <div style={{ display: 'flex', alignItems: 'stretch' }}>
       {isLeft ? <>{children}{connector}{match}</> : <>{match}{connector}{children}</>}
+    </div>
+  );
+}
+
+/* ================================================================== */
+/*  Zoomable wrapper for bracket (pinch + buttons)                    */
+/* ================================================================== */
+function ZoomableBracket({ children }) {
+  const [scale, setScale] = useState(0.55);
+  const containerRef = useRef(null);
+  const lastDistRef = useRef(null);
+
+  const clamp = (v) => Math.min(Math.max(v, 0.25), 1.5);
+  const zoom = (delta) => setScale(s => clamp(s + delta));
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const onTouchStart = (e) => {
+      if (e.touches.length === 2) {
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        lastDistRef.current = Math.hypot(dx, dy);
+      }
+    };
+    const onTouchMove = (e) => {
+      if (e.touches.length === 2 && lastDistRef.current) {
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        const dist = Math.hypot(dx, dy);
+        const delta = (dist - lastDistRef.current) * 0.003;
+        lastDistRef.current = dist;
+        setScale(s => clamp(s + delta));
+        e.preventDefault();
+      }
+    };
+    const onTouchEnd = () => { lastDistRef.current = null; };
+    el.addEventListener('touchstart', onTouchStart, { passive: false });
+    el.addEventListener('touchmove', onTouchMove, { passive: false });
+    el.addEventListener('touchend', onTouchEnd);
+    return () => {
+      el.removeEventListener('touchstart', onTouchStart);
+      el.removeEventListener('touchmove', onTouchMove);
+      el.removeEventListener('touchend', onTouchEnd);
+    };
+  }, []);
+
+  return (
+    <div className="relative">
+      <div className="flex items-center justify-end gap-1 mb-2">
+        <button onClick={() => zoom(-0.1)}
+          className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 text-white text-sm font-bold flex items-center justify-center">−</button>
+        <button onClick={() => setScale(0.55)}
+          className="px-2 h-7 rounded-full bg-white/10 hover:bg-white/20 text-white text-[10px] font-bold flex items-center justify-center">
+          {Math.round(scale * 100)}%
+        </button>
+        <button onClick={() => zoom(0.1)}
+          className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 text-white text-sm font-bold flex items-center justify-center">+</button>
+      </div>
+      <div ref={containerRef} className="overflow-auto rounded-lg" style={{ maxHeight: '70vh', WebkitOverflowScrolling: 'touch' }}>
+        <div style={{ transform: `scale(${scale})`, transformOrigin: 'top left', minWidth: 'max-content' }}>
+          {children}
+        </div>
+      </div>
     </div>
   );
 }
@@ -395,6 +459,57 @@ const WorldCupTab = ({ users, selectedUserId, isAdmin, showMessage }) => {
       </div>
     );
 
+    /* Bracket content (used by zoom wrapper) */
+    const bracketContent = (
+      <div style={{ display: 'inline-flex', flexDirection: 'column', minWidth: 'max-content' }}>
+        {/* Column headers row */}
+        {(() => {
+          const labels = ['16es de finale', '8es de finale', 'Quarts', 'Demi-finale', 'Finale', 'Demi-finale', 'Quarts', '8es de finale', '16es de finale'];
+          const colW = MATCH_W;
+          const gapW = CONN_W;
+          return (
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}>
+              {labels.map((label, i) => (
+                <React.Fragment key={i}>
+                  {i > 0 && <div style={{ width: gapW, flexShrink: 0 }} />}
+                  <div style={{ width: colW, flexShrink: 0, textAlign: 'center' }}>
+                    <span className={`text-[8px] font-black uppercase tracking-[0.1em] px-2 py-0.5 rounded border whitespace-nowrap ${
+                      label === 'Finale'
+                        ? 'text-yellow-400 bg-yellow-400/10 border-yellow-500/30'
+                        : 'text-cyan-400 bg-white/5 border-cyan-400/20'
+                    }`}>
+                      {label}
+                    </span>
+                  </div>
+                </React.Fragment>
+              ))}
+            </div>
+          );
+        })()}
+
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          {leftTree}
+          {hLine}
+          {/* Center: Final + 3rd */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20, flexShrink: 0 }}>
+            {d.final.length > 0 && mc(d.final[0], { isFinal: true })}
+            {d.third.length > 0 && (
+              <div>
+                <div className="text-center mb-1">
+                  <span className="text-[8px] font-bold uppercase tracking-[0.1em] text-slate-500 bg-white/5 px-2 py-0.5 rounded border border-white/10">
+                    3ème place
+                  </span>
+                </div>
+                {mc(d.third[0], { isThird: true })}
+              </div>
+            )}
+          </div>
+          {hLine}
+          {rightTree}
+        </div>
+      </div>
+    );
+
     return (
       <div className="rounded-2xl overflow-hidden" style={{ background: 'linear-gradient(135deg, #0b1329 0%, #1d1a39 50%, #2e0834 100%)' }}>
         <div className="relative p-4 sm:p-5">
@@ -403,61 +518,12 @@ const WorldCupTab = ({ users, selectedUserId, isAdmin, showMessage }) => {
             background: 'radial-gradient(circle at 15% 25%, rgba(0,242,254,0.06) 0%, transparent 40%), radial-gradient(circle at 85% 75%, rgba(217,70,239,0.08) 0%, transparent 40%)'
           }} />
 
-          <h3 className="relative z-10 text-center text-xs sm:text-sm font-black uppercase tracking-[0.2em] mb-5"
+          <h3 className="relative z-10 text-center text-xs sm:text-sm font-black uppercase tracking-[0.2em] mb-3"
             style={{ background: 'linear-gradient(to right, #00f2fe, #4bacff, #d946ef)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
             Tableau de la phase finale
           </h3>
 
-          {/* Bracket */}
-          <div className="overflow-x-auto pb-2 relative z-10">
-            <div style={{ display: 'inline-flex', flexDirection: 'column', minWidth: 'max-content' }}>
-              {/* Column headers row */}
-              {(() => {
-                const labels = ['16es de finale', '8es de finale', 'Quarts', 'Demi-finale', 'Finale', 'Demi-finale', 'Quarts', '8es de finale', '16es de finale'];
-                const colW = MATCH_W;
-                const gapW = CONN_W;
-                return (
-                  <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}>
-                    {labels.map((label, i) => (
-                      <React.Fragment key={i}>
-                        {i > 0 && <div style={{ width: gapW, flexShrink: 0 }} />}
-                        <div style={{ width: colW, flexShrink: 0, textAlign: 'center' }}>
-                          <span className={`text-[8px] font-black uppercase tracking-[0.1em] px-2 py-0.5 rounded border whitespace-nowrap ${
-                            label === 'Finale'
-                              ? 'text-yellow-400 bg-yellow-400/10 border-yellow-500/30'
-                              : 'text-cyan-400 bg-white/5 border-cyan-400/20'
-                          }`}>
-                            {label}
-                          </span>
-                        </div>
-                      </React.Fragment>
-                    ))}
-                  </div>
-                );
-              })()}
-
-              <div style={{ display: 'flex', alignItems: 'center' }}>
-                {leftTree}
-                {hLine}
-                {/* Center: Final + 3rd */}
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20, flexShrink: 0 }}>
-                  {d.final.length > 0 && mc(d.final[0], { isFinal: true })}
-                  {d.third.length > 0 && (
-                    <div>
-                      <div className="text-center mb-1">
-                        <span className="text-[8px] font-bold uppercase tracking-[0.1em] text-slate-500 bg-white/5 px-2 py-0.5 rounded border border-white/10">
-                          3ème place
-                        </span>
-                      </div>
-                      {mc(d.third[0], { isThird: true })}
-                    </div>
-                  )}
-                </div>
-                {hLine}
-                {rightTree}
-              </div>
-            </div>
-          </div>
+          <ZoomableBracket>{bracketContent}</ZoomableBracket>
         </div>
       </div>
     );
