@@ -410,50 +410,52 @@ const WorldCupTab = ({ users, selectedUserId, isAdmin, showMessage }) => {
 
           {/* Bracket */}
           <div className="overflow-x-auto pb-2 relative z-10">
-            {/* Column headers row */}
-            {(() => {
-              const labels = ['16es de finale', '8es de finale', 'Quarts', 'Demi-finale', 'Finale', 'Demi-finale', 'Quarts', '8es de finale', '16es de finale'];
-              const colW = MATCH_W;
-              const gapW = CONN_W;
-              return (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
-                  {labels.map((label, i) => (
-                    <React.Fragment key={i}>
-                      {i > 0 && <div style={{ width: gapW, flexShrink: 0 }} />}
-                      <div style={{ width: colW, flexShrink: 0, textAlign: 'center' }}>
-                        <span className={`text-[8px] font-black uppercase tracking-[0.1em] px-2 py-0.5 rounded border whitespace-nowrap ${
-                          label === 'Finale'
-                            ? 'text-yellow-400 bg-yellow-400/10 border-yellow-500/30'
-                            : 'text-cyan-400 bg-white/5 border-cyan-400/20'
-                        }`}>
-                          {label}
+            <div style={{ display: 'inline-flex', flexDirection: 'column', minWidth: 'max-content' }}>
+              {/* Column headers row */}
+              {(() => {
+                const labels = ['16es de finale', '8es de finale', 'Quarts', 'Demi-finale', 'Finale', 'Demi-finale', 'Quarts', '8es de finale', '16es de finale'];
+                const colW = MATCH_W;
+                const gapW = CONN_W;
+                return (
+                  <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}>
+                    {labels.map((label, i) => (
+                      <React.Fragment key={i}>
+                        {i > 0 && <div style={{ width: gapW, flexShrink: 0 }} />}
+                        <div style={{ width: colW, flexShrink: 0, textAlign: 'center' }}>
+                          <span className={`text-[8px] font-black uppercase tracking-[0.1em] px-2 py-0.5 rounded border whitespace-nowrap ${
+                            label === 'Finale'
+                              ? 'text-yellow-400 bg-yellow-400/10 border-yellow-500/30'
+                              : 'text-cyan-400 bg-white/5 border-cyan-400/20'
+                          }`}>
+                            {label}
+                          </span>
+                        </div>
+                      </React.Fragment>
+                    ))}
+                  </div>
+                );
+              })()}
+
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                {leftTree}
+                {hLine}
+                {/* Center: Final + 3rd */}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20, flexShrink: 0 }}>
+                  {d.final.length > 0 && mc(d.final[0], { isFinal: true })}
+                  {d.third.length > 0 && (
+                    <div>
+                      <div className="text-center mb-1">
+                        <span className="text-[8px] font-bold uppercase tracking-[0.1em] text-slate-500 bg-white/5 px-2 py-0.5 rounded border border-white/10">
+                          3ème place
                         </span>
                       </div>
-                    </React.Fragment>
-                  ))}
-                </div>
-              );
-            })()}
-
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              {leftTree}
-              {hLine}
-              {/* Center: Final + 3rd */}
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20, flexShrink: 0 }}>
-                {d.final.length > 0 && mc(d.final[0], { isFinal: true })}
-                {d.third.length > 0 && (
-                  <div>
-                    <div className="text-center mb-1">
-                      <span className="text-[8px] font-bold uppercase tracking-[0.1em] text-slate-500 bg-white/5 px-2 py-0.5 rounded border border-white/10">
-                        3ème place
-                      </span>
+                      {mc(d.third[0], { isThird: true })}
                     </div>
-                    {mc(d.third[0], { isThird: true })}
-                  </div>
-                )}
+                  )}
+                </div>
+                {hLine}
+                {rightTree}
               </div>
-              {hLine}
-              {rightTree}
             </div>
           </div>
         </div>
