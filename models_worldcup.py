@@ -18,6 +18,7 @@ class WCMatch(db.Model):
     venue = db.Column(db.String, nullable=True)
     score_a = db.Column(db.Integer, nullable=True)
     score_b = db.Column(db.Integer, nullable=True)
+    penalty_winner = db.Column(db.String, nullable=True)    # 'a' or 'b' — who won on penalties
     status = db.Column(db.String, default='upcoming')      # upcoming | completed
     # Links to previous-round matches whose winners feed into this one
     source_a = db.Column(db.String, nullable=True)         # e.g. "R32-1"
@@ -33,4 +34,5 @@ class WCBet(db.Model):
     match_id = db.Column(db.String, db.ForeignKey('wc_matches.id'), nullable=False)
     predicted_a = db.Column(db.Integer, nullable=False)
     predicted_b = db.Column(db.Integer, nullable=False)
+    predicted_pen_winner = db.Column(db.String, nullable=True)  # 'a' or 'b' — predicted penalty winner
     points_awarded = db.Column(db.Integer, nullable=True)

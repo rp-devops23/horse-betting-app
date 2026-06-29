@@ -83,14 +83,17 @@ class WorldCupService:
             logger.error(f"[WC] update_match_teams error: {e}")
             return False
 
-    def enter_result(self, match_id, score_a, score_b):
+    def enter_result(self, match_id, score_a, score_b, penalty_winner=None):
         """Admin enters final score. Scores bets and propagates winner."""
         try:
             match = WCMatch.query.get(match_id)
             if not match:
                 return False, "Match not found"
+            if score_a == score_b and not penalty_winner:
+                return False, "Draw in knockout: penalty_winner ('a' or 'b') is required"
             match.score_a = score_a
             match.score_b = score_b
+            match.penalty_winner = penalty_winner if score_a == score_b else None
             match.status = 'completed'
             # Score all bets for this match
             self._score_match(match)
@@ -105,7 +108,7 @@ class WorldCupService:
 
     # --- Predictions ---
 
-    def place_prediction(self, user_id, match_id, predicted_a, predicted_b):
+    def place_prediction(self, user_id, match_id, predicted_a, predicted_b, predicted_pen_winner=None):
         match = WCMatch.query.get(match_id)
         if not match:
             return False, "Match not found"
@@ -115,12 +118,15 @@ class WorldCupService:
             return False, "Match has already started"
         if not match.team_a or not match.team_b:
             return False, "Teams not yet determined"
+        if predicted_a == predicted_b and not predicted_pen_winner:
+            return False, "Draw predicted: choose a penalty winner (penaltyWinner: 'a' or 'b')"
 
         try:
             existing = WCBet.query.filter_by(user_id=user_id, match_id=match_id).first()
             if existing:
                 existing.predicted_a = predicted_a
                 existing.predicted_b = predicted_b
+                existing.predicted_pen_winner = predicted_pen_winner if predicted_a == predicted_b else None
                 existing.points_awarded = None
             else:
                 bet = WCBet(
@@ -129,6 +135,7 @@ class WorldCupService:
                     match_id=match_id,
                     predicted_a=predicted_a,
                     predicted_b=predicted_b,
+                    predicted_pen_winner=predicted_pen_winner if predicted_a == predicted_b else None,
                 )
                 db.session.add(bet)
             db.session.commit()
@@ -143,6 +150,7 @@ class WorldCupService:
         return {b.match_id: {
             'predicted_a': b.predicted_a,
             'predicted_b': b.predicted_b,
+            'predicted_pen_winner': b.predicted_pen_winner,
             'points_awarded': b.points_awarded,
         } for b in bets}
 
@@ -159,6 +167,7 @@ class WorldCupService:
             'name': users.get(b.user_id, b.user_id),
             'predicted_a': b.predicted_a,
             'predicted_b': b.predicted_b,
+            'predicted_pen_winner': b.predicted_pen_winner,
             'points_awarded': b.points_awarded,
         } for b in sorted(bets, key=lambda x: -(x.points_awarded or 0))]
 
@@ -177,6 +186,7 @@ class WorldCupService:
                 'name': users.get(b.user_id, b.user_id),
                 'predicted_a': b.predicted_a,
                 'predicted_b': b.predicted_b,
+                'predicted_pen_winner': b.predicted_pen_winner,
                 'points_awarded': b.points_awarded,
             })
         for mid in result:
@@ -241,22 +251,54 @@ class WorldCupService:
     def _score_match(self, match):
         bets = WCBet.query.filter_by(match_id=match.id).all()
         sa, sb = match.score_a, match.score_b
+        pen = match.penalty_winner  # 'a', 'b', or None
         for bet in bets:
             pa, pb = bet.predicted_a, bet.predicted_b
+            # Exact score match
             if pa == sa and pb == sb:
-                bet.points_awarded = 3
+                if sa == sb:
+                    # Both draw — check penalty winner prediction
+                    bet.points_awarded = 3 if bet.predicted_pen_winner == pen else 2
+                else:
+                    bet.points_awarded = 3
             elif (pa - pb) == (sa - sb) and _same_outcome(pa, pb, sa, sb):
                 bet.points_awarded = 2
-            elif _same_outcome(pa, pb, sa, sb):
+            elif self._same_winner(pa, pb, bet.predicted_pen_winner, sa, sb, pen):
                 bet.points_awarded = 1
             else:
                 bet.points_awarded = 0
 
+    @staticmethod
+    def _same_winner(pa, pb, pred_pen, sa, sb, actual_pen):
+        """Check if predicted and actual winners match (accounting for penalties)."""
+        # Determine predicted winner
+        if pa > pb:
+            pred_w = 'a'
+        elif pb > pa:
+            pred_w = 'b'
+        else:
+            pred_w = pred_pen  # draw → penalty winner
+        # Determine actual winner
+        if sa > sb:
+            act_w = 'a'
+        elif sb > sa:
+            act_w = 'b'
+        else:
+            act_w = actual_pen  # draw → penalty winner
+        return pred_w == act_w and pred_w is not None
+
     def _propagate_winner(self, match):
         """After a result, update the downstream match with the winner team."""
-        winner = match.team_a if match.score_a > match.score_b else match.team_b
-        if match.score_a == match.score_b:
-            return  # Draw in knockout needs penalties — admin updates manually
+        if match.score_a > match.score_b:
+            winner = match.team_a
+        elif match.score_b > match.score_a:
+            winner = match.team_b
+        elif match.penalty_winner == 'a':
+            winner = match.team_a
+        elif match.penalty_winner == 'b':
+            winner = match.team_b
+        else:
+            return  # Can't propagate without knowing the winner
         # Find any match that has this match as source_a or source_b
         downstream_a = WCMatch.query.filter_by(source_a=match.id).first()
         if downstream_a:
@@ -276,6 +318,7 @@ class WorldCupService:
             'venue': m.venue,
             'score_a': m.score_a,
             'score_b': m.score_b,
+            'penalty_winner': m.penalty_winner,
             'status': m.status,
             'source_a': m.source_a,
             'source_b': m.source_b,

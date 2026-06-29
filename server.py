@@ -94,6 +94,9 @@ def apply_migrations(app):
                 conn.execute(text("ALTER TABLE horses ADD COLUMN IF NOT EXISTS age INTEGER"))
                 conn.execute(text("ALTER TABLE horses ADD COLUMN IF NOT EXISTS form VARCHAR"))
                 conn.execute(text("ALTER TABLE user_scores ADD COLUMN IF NOT EXISTS wins INTEGER DEFAULT 0"))
+                # World Cup penalty columns (temporary)
+                conn.execute(text("ALTER TABLE wc_matches ADD COLUMN IF NOT EXISTS penalty_winner VARCHAR"))
+                conn.execute(text("ALTER TABLE wc_bets ADD COLUMN IF NOT EXISTS predicted_pen_winner VARCHAR"))
                 conn.commit()
         except Exception as e:
             print(f"[Migration] {e}")

@@ -38,7 +38,8 @@ def enter_result(match_id):
     score_b = data.get('score_b')
     if score_a is None or score_b is None:
         return jsonify({"error": "score_a and score_b are required"}), 400
-    success, error = wc_service.enter_result(match_id, int(score_a), int(score_b))
+    penalty_winner = data.get('penalty_winner')  # 'a' or 'b'
+    success, error = wc_service.enter_result(match_id, int(score_a), int(score_b), penalty_winner=penalty_winner)
     if success:
         return jsonify({"success": True})
     return jsonify({"error": error}), 400
@@ -64,9 +65,10 @@ def place_prediction():
     match_id = data.get('matchId')
     predicted_a = data.get('predictedA')
     predicted_b = data.get('predictedB')
+    penalty_winner = data.get('penaltyWinner')  # 'a' or 'b'
     if not all(v is not None for v in [user_id, match_id, predicted_a, predicted_b]):
         return jsonify({"error": "userId, matchId, predictedA and predictedB are required"}), 400
-    success, error = wc_service.place_prediction(user_id, match_id, int(predicted_a), int(predicted_b))
+    success, error = wc_service.place_prediction(user_id, match_id, int(predicted_a), int(predicted_b), predicted_pen_winner=penalty_winner)
     if success:
         return jsonify({"success": True})
     return jsonify({"error": error}), 400
