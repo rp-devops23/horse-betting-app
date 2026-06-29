@@ -43,6 +43,7 @@ def create_app():
 
     # Import models after database is initialized (this registers them with SQLAlchemy)
     from models import User, Race, Horse, Bet, UserScore
+    from models_worldcup import WCMatch, WCBet  # World Cup (temporary)
 
     # Import and register route blueprints AFTER database setup
     from routes.users import users_bp
@@ -50,6 +51,7 @@ def create_app():
     from routes.admin import admin_bp
     from routes.race_days import race_days_bp
     from routes.betting import betting_bp
+    from routes.worldcup import worldcup_bp  # World Cup (temporary)
 
     # Register the route blueprints
     app.register_blueprint(users_bp, url_prefix='/api')
@@ -57,6 +59,7 @@ def create_app():
     app.register_blueprint(admin_bp, url_prefix='/api/admin')
     app.register_blueprint(race_days_bp, url_prefix='/api/race-days')
     app.register_blueprint(betting_bp, url_prefix='/api')
+    app.register_blueprint(worldcup_bp, url_prefix='/api/worldcup')  # World Cup (temporary)
 
     @app.route('/')
     def index():
