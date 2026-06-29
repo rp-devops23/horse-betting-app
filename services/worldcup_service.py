@@ -114,7 +114,7 @@ class WorldCupService:
             return False, "Match not found"
         if match.status == 'completed':
             return False, "Match already completed"
-        if match.kickoff_utc and datetime.now(timezone.utc) >= match.kickoff_utc:
+        if match.kickoff_utc and datetime.now(timezone.utc) >= match.kickoff_utc.replace(tzinfo=timezone.utc):
             return False, "Match has already started"
         if not match.team_a or not match.team_b:
             return False, "Teams not yet determined"
