@@ -78,28 +78,32 @@ create_tables(app)
 def apply_migrations(app):
     from database import db
     from sqlalchemy import text
+    migrations = [
+        "ALTER TABLE races ADD COLUMN IF NOT EXISTS last_horse_number INTEGER",
+        "ALTER TABLE horses ADD COLUMN IF NOT EXISTS scratched BOOLEAN DEFAULT FALSE",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN DEFAULT FALSE",
+        "ALTER TABLE races ADD COLUMN IF NOT EXISTS name VARCHAR",
+        "ALTER TABLE races ADD COLUMN IF NOT EXISTS time VARCHAR",
+        "ALTER TABLE races ADD COLUMN IF NOT EXISTS distance VARCHAR",
+        "ALTER TABLE horses ADD COLUMN IF NOT EXISTS stall_number INTEGER",
+        "ALTER TABLE horses ADD COLUMN IF NOT EXISTS jockey VARCHAR",
+        "ALTER TABLE horses ADD COLUMN IF NOT EXISTS trainer VARCHAR",
+        "ALTER TABLE horses ADD COLUMN IF NOT EXISTS weight_kg FLOAT",
+        "ALTER TABLE horses ADD COLUMN IF NOT EXISTS age INTEGER",
+        "ALTER TABLE horses ADD COLUMN IF NOT EXISTS form VARCHAR",
+        "ALTER TABLE user_scores ADD COLUMN IF NOT EXISTS wins INTEGER DEFAULT 0",
+        # World Cup penalty columns (temporary)
+        "ALTER TABLE wc_matches ADD COLUMN IF NOT EXISTS penalty_winner VARCHAR",
+        "ALTER TABLE wc_bets ADD COLUMN IF NOT EXISTS predicted_pen_winner VARCHAR",
+    ]
     with app.app_context():
-        try:
-            with db.engine.connect() as conn:
-                conn.execute(text("ALTER TABLE races ADD COLUMN IF NOT EXISTS last_horse_number INTEGER"))
-                conn.execute(text("ALTER TABLE horses ADD COLUMN IF NOT EXISTS scratched BOOLEAN DEFAULT FALSE"))
-                conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN DEFAULT FALSE"))
-                conn.execute(text("ALTER TABLE races ADD COLUMN IF NOT EXISTS name VARCHAR"))
-                conn.execute(text("ALTER TABLE races ADD COLUMN IF NOT EXISTS time VARCHAR"))
-                conn.execute(text("ALTER TABLE races ADD COLUMN IF NOT EXISTS distance VARCHAR"))
-                conn.execute(text("ALTER TABLE horses ADD COLUMN IF NOT EXISTS stall_number INTEGER"))
-                conn.execute(text("ALTER TABLE horses ADD COLUMN IF NOT EXISTS jockey VARCHAR"))
-                conn.execute(text("ALTER TABLE horses ADD COLUMN IF NOT EXISTS trainer VARCHAR"))
-                conn.execute(text("ALTER TABLE horses ADD COLUMN IF NOT EXISTS weight_kg FLOAT"))
-                conn.execute(text("ALTER TABLE horses ADD COLUMN IF NOT EXISTS age INTEGER"))
-                conn.execute(text("ALTER TABLE horses ADD COLUMN IF NOT EXISTS form VARCHAR"))
-                conn.execute(text("ALTER TABLE user_scores ADD COLUMN IF NOT EXISTS wins INTEGER DEFAULT 0"))
-                # World Cup penalty columns (temporary)
-                conn.execute(text("ALTER TABLE wc_matches ADD COLUMN IF NOT EXISTS penalty_winner VARCHAR"))
-                conn.execute(text("ALTER TABLE wc_bets ADD COLUMN IF NOT EXISTS predicted_pen_winner VARCHAR"))
-                conn.commit()
-        except Exception as e:
-            print(f"[Migration] {e}")
+        with db.engine.connect() as conn:
+            for sql in migrations:
+                try:
+                    conn.execute(text(sql))
+                    conn.commit()
+                except Exception as e:
+                    print(f"[Migration] {sql[:50]}... -> {e}")
 
 apply_migrations(app)
 
