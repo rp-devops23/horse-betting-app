@@ -316,13 +316,13 @@ const WorldCupTab = ({ users, selectedUserId, isAdmin, showMessage }) => {
     setResultDrafts(prev => ({ ...prev, [matchId]: { ...prev[matchId], [side]: v } }));
   };
 
-  const now = new Date();
-  const matchStarted = (m) => m.status === 'completed' || (m.kickoff_utc && new Date(m.kickoff_utc) <= now);
+  const matchStarted = (m) => m.status === 'completed' || (m.kickoff_utc && new Date(m.kickoff_utc) <= new Date());
 
   /* ---------- computed values ---------- */
   const nextMatch = useMemo(() => {
-    return matches.find(m => m.status !== 'completed' && m.kickoff_utc && new Date(m.kickoff_utc) > now && teamName(m.team_a) && teamName(m.team_b));
-  }, [matches, now]);
+    const n = new Date();
+    return matches.find(m => m.status !== 'completed' && m.kickoff_utc && new Date(m.kickoff_utc) > n && teamName(m.team_a) && teamName(m.team_b));
+  }, [matches]);
 
   const unpredictedCount = useMemo(() => {
     if (!selectedUserId) return 0;
@@ -639,7 +639,6 @@ const WorldCupTab = ({ users, selectedUserId, isAdmin, showMessage }) => {
     }
 
     const top3 = leaderboard.slice(0, 3);
-    const rest = leaderboard.slice(3);
     const podiumOrder = top3.length >= 3 ? [top3[1], top3[0], top3[2]] : top3;
     const podiumHeights = ['h-20', 'h-28', 'h-16'];
     const podiumColors = ['bg-gradient-to-t from-gray-300 to-gray-200', 'bg-gradient-to-t from-yellow-400 to-yellow-300', 'bg-gradient-to-t from-orange-300 to-orange-200'];
