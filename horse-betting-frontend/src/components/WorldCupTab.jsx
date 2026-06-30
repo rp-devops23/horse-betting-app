@@ -243,7 +243,6 @@ const WorldCupTab = ({ users, selectedUserId, isAdmin, showMessage }) => {
   const [leaderboard, setLeaderboard] = useState([]);
   const [loading, setLoading] = useState(true);
   const [drafts, setDrafts] = useState({});
-  const [resultDrafts, setResultDrafts] = useState({});
   const [syncing, setSyncing] = useState(false);
   const [expandedMatch, setExpandedMatch] = useState(null);
   const [selectedPlayer, setSelectedPlayer] = useState(null);
@@ -291,33 +290,17 @@ const WorldCupTab = ({ users, selectedUserId, isAdmin, showMessage }) => {
     try {
       const res = await fetch(`${API_BASE}/worldcup/predict`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: selectedUserId, matchId, predictedA: Number(d.a), predictedB: Number(d.b), penaltyWinner: isDraw ? d.pen : null }) });
+      if (!res.ok) { const txt = await res.text(); try { showMessage(JSON.parse(txt).error, 'error'); } catch { showMessage('Erreur serveur', 'error'); } return; }
       const data = await res.json();
       if (data.success) { showMessage('Pronostic enregistré !', 'success'); fetchData(); }
-      else showMessage(data.error, 'error');
+      else showMessage(data.error || 'Erreur inconnue', 'error');
     } catch (e) { showMessage(`Erreur : ${e.message}`, 'error'); }
   };
 
-  const submitResult = async (matchId) => {
-    const d = resultDrafts[matchId];
-    if (!d || d.a === '' || d.b === '') { showMessage('Entrez le score final.', 'info'); return; }
-    const isDraw = Number(d.a) === Number(d.b);
-    if (isDraw && !d.pen) { showMessage('Égalité : choisis le vainqueur aux tirs au but.', 'info'); return; }
-    try {
-      const res = await fetch(`${API_BASE}/worldcup/matches/${matchId}/result`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ score_a: Number(d.a), score_b: Number(d.b), penalty_winner: isDraw ? d.pen : null }) });
-      const data = await res.json();
-      if (data.success) { showMessage('Résultat enregistré !', 'success'); fetchData(); }
-      else showMessage(data.error, 'error');
-    } catch (e) { showMessage(`Erreur : ${e.message}`, 'error'); }
-  };
 
   const setDraft = (matchId, side, val) => {
     const v = val.replace(/\D/g, '').slice(0, 2);
     setDrafts(prev => ({ ...prev, [matchId]: { ...prev[matchId], [side]: v } }));
-  };
-  const setResultDraft = (matchId, side, val) => {
-    const v = val.replace(/\D/g, '').slice(0, 2);
-    setResultDrafts(prev => ({ ...prev, [matchId]: { ...prev[matchId], [side]: v } }));
   };
 
   const matchStarted = (m) => m.status === 'completed' || (m.kickoff_utc && new Date(m.kickoff_utc) <= new Date());
@@ -353,11 +336,8 @@ const WorldCupTab = ({ users, selectedUserId, isAdmin, showMessage }) => {
   const renderMatchCard = (m) => {
     const pred = predictions[m.id];
     const started = matchStarted(m);
-    const draft = drafts[m.id] || { a: pred ? String(pred.predicted_a) : '', b: pred ? String(pred.predicted_b) : '', pen: pred?.predicted_pen_winner || null };
-    const rDraft = resultDrafts[m.id] || { a: '', b: '', pen: null };
     const tA = teamName(m.team_a);
     const tB = teamName(m.team_b);
-    const canPredict = selectedUserId && !started && tA && tB;
     const completed = m.status === 'completed';
     const matchPreds = allPredictions[m.id] || [];
     const isExpanded = expandedMatch === m.id;
@@ -455,89 +435,6 @@ const WorldCupTab = ({ users, selectedUserId, isAdmin, showMessage }) => {
           </div>
         )}
 
-        {/* Prediction form */}
-        {canPredict && (() => {
-          const isDraw = draft.a !== '' && draft.b !== '' && Number(draft.a) === Number(draft.b);
-          return (
-            <div className="border-t border-indigo-100">
-              <div className="flex items-center justify-center gap-2 px-4 py-3 bg-indigo-50/50">
-                <span className="text-xs text-indigo-400 font-semibold mr-1">Prono</span>
-                <input type="text" inputMode="numeric" maxLength={2} value={draft.a} onChange={e => setDraft(m.id, 'a', e.target.value)}
-                  className="w-10 h-8 text-center border-2 border-indigo-200 rounded-lg text-sm font-bold focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 focus:outline-none bg-white" placeholder="-" />
-                <span className="text-indigo-300 font-bold">:</span>
-                <input type="text" inputMode="numeric" maxLength={2} value={draft.b} onChange={e => setDraft(m.id, 'b', e.target.value)}
-                  className="w-10 h-8 text-center border-2 border-indigo-200 rounded-lg text-sm font-bold focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 focus:outline-none bg-white" placeholder="-" />
-                {!isDraw && (
-                  <button onClick={() => submitPrediction(m.id)}
-                    className="ml-2 bg-indigo-600 text-white text-xs font-bold px-4 py-1.5 rounded-lg hover:bg-indigo-700 transition-all active:scale-95">
-                    {pred ? 'Modifier' : 'Valider'}
-                  </button>
-                )}
-              </div>
-              {isDraw && (
-                <div className="flex items-center justify-center gap-2 px-4 py-2.5 bg-amber-50/80">
-                  <span className="text-[10px] text-amber-600 font-bold">Tirs au but :</span>
-                  <button onClick={() => setDrafts(prev => ({ ...prev, [m.id]: { ...prev[m.id], pen: 'a' } }))}
-                    className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-all active:scale-95 ${
-                      draft.pen === 'a' ? 'bg-amber-500 text-white ring-2 ring-amber-300' : 'bg-white text-gray-600 border border-gray-300 hover:border-amber-400'
-                    }`}>
-                    {tA}
-                  </button>
-                  <button onClick={() => setDrafts(prev => ({ ...prev, [m.id]: { ...prev[m.id], pen: 'b' } }))}
-                    className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-all active:scale-95 ${
-                      draft.pen === 'b' ? 'bg-amber-500 text-white ring-2 ring-amber-300' : 'bg-white text-gray-600 border border-gray-300 hover:border-amber-400'
-                    }`}>
-                    {tB}
-                  </button>
-                  {draft.pen && (
-                    <button onClick={() => submitPrediction(m.id)}
-                      className="ml-1 bg-indigo-600 text-white text-xs font-bold px-4 py-1.5 rounded-lg hover:bg-indigo-700 transition-all active:scale-95">
-                      {pred ? 'Modifier' : 'Valider'}
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-          );
-        })()}
-
-        {/* Admin result entry */}
-        {isAdmin && m.status !== 'completed' && tA && tB && (() => {
-          const isDrawR = rDraft.a !== '' && rDraft.b !== '' && Number(rDraft.a) === Number(rDraft.b);
-          return (
-            <div className="border-t border-orange-200">
-              <div className="flex items-center justify-center gap-2 px-4 py-2.5 bg-orange-50">
-                <span className="text-[10px] text-orange-400 font-bold uppercase tracking-wider">Admin</span>
-                <input type="text" inputMode="numeric" maxLength={2} value={rDraft.a} onChange={e => setResultDraft(m.id, 'a', e.target.value)}
-                  className="w-10 h-7 text-center border-2 border-orange-300 rounded-lg text-sm font-bold focus:ring-2 focus:ring-orange-400 focus:outline-none bg-white" placeholder="-" />
-                <span className="text-orange-300 font-bold">:</span>
-                <input type="text" inputMode="numeric" maxLength={2} value={rDraft.b} onChange={e => setResultDraft(m.id, 'b', e.target.value)}
-                  className="w-10 h-7 text-center border-2 border-orange-300 rounded-lg text-sm font-bold focus:ring-2 focus:ring-orange-400 focus:outline-none bg-white" placeholder="-" />
-                {!isDrawR && (
-                  <button onClick={() => submitResult(m.id)}
-                    className="ml-1 bg-orange-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-orange-600 transition-all active:scale-95">OK</button>
-                )}
-              </div>
-              {isDrawR && (
-                <div className="flex items-center justify-center gap-2 px-4 py-2 bg-orange-50/50">
-                  <span className="text-[10px] text-orange-500 font-bold">Pénaltys :</span>
-                  <button onClick={() => setResultDrafts(prev => ({ ...prev, [m.id]: { ...prev[m.id], pen: 'a' } }))}
-                    className={`text-[10px] font-bold px-2.5 py-1 rounded-lg transition-all ${
-                      rDraft.pen === 'a' ? 'bg-orange-500 text-white' : 'bg-white text-gray-600 border border-orange-300'
-                    }`}>{tA}</button>
-                  <button onClick={() => setResultDrafts(prev => ({ ...prev, [m.id]: { ...prev[m.id], pen: 'b' } }))}
-                    className={`text-[10px] font-bold px-2.5 py-1 rounded-lg transition-all ${
-                      rDraft.pen === 'b' ? 'bg-orange-500 text-white' : 'bg-white text-gray-600 border border-orange-300'
-                    }`}>{tB}</button>
-                  {rDraft.pen && (
-                    <button onClick={() => submitResult(m.id)}
-                      className="ml-1 bg-orange-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-orange-600 transition-all active:scale-95">OK</button>
-                  )}
-                </div>
-              )}
-            </div>
-          );
-        })()}
       </div>
     );
   };
