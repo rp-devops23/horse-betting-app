@@ -1,0 +1,30 @@
+name: World Cup Score Sync
+
+on:
+  schedule:
+    # Every 5 minutes during World Cup knockout phase (June 28 – July 19, 2026)
+    - cron: "*/5 * 28-30 6 *"   # June 28-30
+    - cron: "*/5 * 1-19 7 *"    # July 1-19
+  workflow_dispatch: # allow manual trigger from GitHub UI
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wake up Render server
+        run: |
+          curl --silent --max-time 60 ${{ secrets.BACKEND_URL }}/api/users || true
+          sleep 3
+
+      - name: Sync World Cup scores from ESPN
+        run: |
+          RESPONSE=$(curl --fail --silent --show-error \
+            --request POST \
+            --max-time 30 \
+            "${{ secrets.BACKEND_URL }}/api/worldcup/fetch" 2>&1) || true
+          echo "$RESPONSE"
+          # Only log if something was updated
+          UPDATED=$(echo "$RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin).get('updated',0))" 2>/dev/null || echo "0")
+          if [ "$UPDATED" != "0" ]; then
+            echo "::notice::$UPDATED match(es) updated with new scores!"
+          fi
