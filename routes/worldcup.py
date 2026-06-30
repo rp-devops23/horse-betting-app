@@ -145,7 +145,8 @@ def fetch_from_espn():
 
         # Update score if match completed and we haven't scored it yet
         if m["status"] == "completed" and match.status != "completed":
-            wc_service.enter_result(m["id"], m["score_a"], m["score_b"], require_penalty=False)
+            wc_service.enter_result(m["id"], m["score_a"], m["score_b"],
+                                       penalty_winner=m.get("penalty_winner"), require_penalty=False)
             updated += 1
 
     db.session.commit()

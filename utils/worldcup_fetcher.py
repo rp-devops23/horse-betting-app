@@ -108,12 +108,19 @@ def fetch_matches():
 
                 score_a = None
                 score_b = None
+                penalty_winner = None
                 status = "upcoming"
                 state = event.get("status", {}).get("type", {}).get("state", "")
                 if state == "post":
                     status = "completed"
                     score_a = int(team_a_data.get("score", 0))
                     score_b = int(team_b_data.get("score", 0))
+                    # Detect penalty winner from ESPN "winner" field
+                    if score_a == score_b:
+                        if team_a_data.get("winner"):
+                            penalty_winner = "a"
+                        elif team_b_data.get("winner"):
+                            penalty_winner = "b"
 
                 kickoff_str = event.get("date", "")
                 kickoff_utc = None
@@ -139,6 +146,7 @@ def fetch_matches():
                     "venue": venue,
                     "score_a": score_a,
                     "score_b": score_b,
+                    "penalty_winner": penalty_winner,
                     "status": status,
                     "round": round_code,
                 })

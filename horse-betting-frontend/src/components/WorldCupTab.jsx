@@ -32,11 +32,6 @@ function teamName(name) {
 }
 
 function actualRound(m) {
-  if (m.round === 'R32' && m.match_number >= 17) return 'R16';
-  if (m.round === 'R16') return 'QF';
-  if (m.round === 'F' && m.match_number <= 2) return 'SF';
-  if (m.round === 'F' && m.match_number === 3) return '3RD';
-  if (m.round === 'F' && m.match_number === 4) return 'F';
   return m.round;
 }
 
@@ -67,12 +62,13 @@ function Countdown({ targetDate }) {
 /*  Build bracket data from flat ESPN matches                         */
 /* ================================================================== */
 function buildBracketData(allMatches) {
-  const r32  = allMatches.filter(m => m.round === 'R32' && m.match_number <= 16);
-  const r16  = allMatches.filter(m => m.round === 'R32' && m.match_number >= 17);
-  const qf   = allMatches.filter(m => m.round === 'R16');
-  const sf   = allMatches.filter(m => m.round === 'F' && m.match_number <= 2);
-  const third = allMatches.filter(m => m.round === 'F' && m.match_number === 3);
-  const final_ = allMatches.filter(m => m.round === 'F' && m.match_number === 4);
+  const byRound = (r) => allMatches.filter(m => m.round === r).sort((a, b) => a.match_number - b.match_number);
+  const r32   = byRound('R32');
+  const r16   = byRound('R16');
+  const qf    = byRound('QF');
+  const sf    = byRound('SF');
+  const third = byRound('3RD');
+  const final_ = byRound('F');
   const half = a => [a.slice(0, Math.ceil(a.length / 2)), a.slice(Math.ceil(a.length / 2))];
   const [r32L, r32R] = half(r32);
   const [r16L, r16R] = half(r16);
