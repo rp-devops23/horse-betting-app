@@ -28,6 +28,19 @@ DATE_RANGES = [
 
 # ESPN stage names → our round codes
 STAGE_MAP = {
+    "round-of-32": "R32",
+    "round-of-16": "R16",
+    "quarterfinals": "QF",
+    "quarter-finals": "QF",
+    "semifinals": "SF",
+    "semi-finals": "SF",
+    "third-place": "3RD",
+    "3rd-place-match": "3RD",
+    "final": "F",
+}
+
+# For matching against event name / notes (not status which contains "Final Score")
+NAME_STAGE_MAP = {
     "Round of 32": "R32",
     "Round of 16": "R16",
     "Quarterfinals": "QF",
@@ -36,33 +49,27 @@ STAGE_MAP = {
     "Semi-Finals": "SF",
     "Third-Place": "3RD",
     "Third Place": "3RD",
-    "Final": "F",
 }
 
 
 def _parse_stage(event):
     """Extract our round code from an ESPN event."""
-    # Try the season type or notes
-    status_type = event.get("status", {}).get("type", {}).get("description", "")
-    # Try the event name or competition slug
-    name = event.get("name", "")
-    season = event.get("season", {}).get("slug", "")
+    # Best source: season.slug (e.g. "round-of-32", "quarterfinals")
+    season_slug = event.get("season", {}).get("slug", "").lower()
+    if season_slug in STAGE_MAP:
+        return STAGE_MAP[season_slug]
 
-    # Check notes first (ESPN sometimes puts stage there)
+    # Check notes (ESPN sometimes puts stage there)
     for note in event.get("notes", []):
         headline = note.get("headline", "")
-        for key, code in STAGE_MAP.items():
+        for key, code in NAME_STAGE_MAP.items():
             if key.lower() in headline.lower():
                 return code
 
     # Check event name
-    for key, code in STAGE_MAP.items():
+    name = event.get("name", "")
+    for key, code in NAME_STAGE_MAP.items():
         if key.lower() in name.lower():
-            return code
-
-    # Fallback: try status
-    for key, code in STAGE_MAP.items():
-        if key.lower() in status_type.lower():
             return code
 
     return "R32"  # default to R32 during group/early knockout
