@@ -435,7 +435,7 @@ const HorseBettingApp = () => {
           <div className="bg-white rounded-xl shadow-2xl px-8 py-6 flex flex-col items-center gap-3 max-w-xs text-center">
             <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
             <p className="font-semibold text-gray-800">Le serveur se réveille…</p>
-            <p className="text-sm text-gray-500">Première connexion de la journée — merci de patienter quelques secondes.</p>
+            <p className="text-sm text-gray-500">Le serveur était en veille — merci de patienter quelques secondes.</p>
           </div>
         </div>
       )}
