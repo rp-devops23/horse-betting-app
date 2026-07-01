@@ -926,7 +926,7 @@ const WorldCupTab = ({ users, selectedUserId, isAdmin, showMessage }) => {
 
   const tabs = [
     { id: 'matches', label: 'Matchs' },
-    { id: 'bracket', label: 'Tableau' },
+    ...(isAdmin ? [{ id: 'bracket', label: 'Tableau' }] : []),
     { id: 'classement', label: 'Classement' },
   ];
   if (selectedUserId) tabs.push({ id: 'mespronos', label: 'Mes Pronos' });
