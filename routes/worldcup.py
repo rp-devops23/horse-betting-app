@@ -4,6 +4,7 @@ World Cup knockout-phase betting routes.
 Temporary feature — delete this file after the tournament.
 """
 
+import re
 from flask import Blueprint, jsonify, request
 from services.worldcup_service import WorldCupService
 
@@ -106,22 +107,7 @@ def fetch_from_espn():
     if not matches:
         return jsonify({"error": "No matches returned from ESPN"}), 502
 
-    # Check if we already have matches seeded
-    existing = WCMatch.query.count()
-    if existing == 0:
-        # First time: seed all matches
-        seed_data = [{
-            "id": m["id"],
-            "round": m["round"],
-            "match_number": m["match_number"],
-            "team_a": m["team_a"],
-            "team_b": m["team_b"],
-            "kickoff_utc": m["kickoff_utc"].isoformat() if m["kickoff_utc"] else None,
-            "venue": m["venue"],
-        } for m in matches]
-        wc_service.seed_matches(seed_data)
-
-    # Update scores and teams for all matches
+    # Upsert all matches (never deletes existing bets)
     updated = 0
     for m in matches:
         match = WCMatch.query.get(m["id"])
@@ -141,7 +127,7 @@ def fetch_from_espn():
         def is_placeholder(name):
             if not name:
                 return True
-            return bool(__import__('re').match(r'^(Round of|Quarterfinal|Semifinal)', name, __import__('re').IGNORECASE))
+            return bool(re.match(r'^(Round of|Quarterfinal|Semifinal)', name, re.IGNORECASE))
 
         if m["team_a"] and (is_placeholder(match.team_a) or not match.team_a):
             match.team_a = m["team_a"]

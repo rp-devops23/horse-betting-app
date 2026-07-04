@@ -38,9 +38,8 @@ class WorldCupService:
         return bracket
 
     def seed_matches(self, matches_data):
-        """Bulk-insert match data. Replaces existing matches."""
+        """Bulk-insert match data. Replaces existing matches but preserves bets."""
         try:
-            WCBet.query.delete()
             WCMatch.query.delete()
             for m in matches_data:
                 kickoff = None
