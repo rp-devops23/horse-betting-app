@@ -97,6 +97,7 @@ def get_all_predictions():
 @worldcup_bp.route('/fetch', methods=['POST'])
 def fetch_from_espn():
     """Fetch matches from ESPN API and seed/update the database."""
+    from datetime import datetime
     from utils.worldcup_fetcher import fetch_matches
     from models_worldcup import WCMatch
     from database import db
@@ -126,7 +127,6 @@ def fetch_from_espn():
         match = WCMatch.query.get(m["id"])
         if not match:
             # New match (e.g. next round just appeared on ESPN)
-            from datetime import datetime
             kickoff = None
             if m["kickoff_utc"]:
                 kickoff = m["kickoff_utc"] if isinstance(m["kickoff_utc"], datetime) else datetime.fromisoformat(str(m["kickoff_utc"]).replace("Z", "+00:00"))
@@ -137,11 +137,23 @@ def fetch_from_espn():
             )
             db.session.add(match)
 
-        # Update teams if they changed (TBD → actual team)
-        if m["team_a"] and not match.team_a:
+        # Update teams (replace TBD/placeholder names with real team names)
+        def is_placeholder(name):
+            if not name:
+                return True
+            return bool(__import__('re').match(r'^(Round of|Quarterfinal|Semifinal)', name, __import__('re').IGNORECASE))
+
+        if m["team_a"] and (is_placeholder(match.team_a) or not match.team_a):
             match.team_a = m["team_a"]
-        if m["team_b"] and not match.team_b:
+        if m["team_b"] and (is_placeholder(match.team_b) or not match.team_b):
             match.team_b = m["team_b"]
+
+        # Update kickoff time and venue if missing or changed
+        if m["kickoff_utc"] and not match.kickoff_utc:
+            kickoff = m["kickoff_utc"] if isinstance(m["kickoff_utc"], datetime) else datetime.fromisoformat(str(m["kickoff_utc"]).replace("Z", "+00:00"))
+            match.kickoff_utc = kickoff
+        if m["venue"] and not match.venue:
+            match.venue = m["venue"]
 
         # Update score if match completed and we haven't scored it yet
         if m["status"] == "completed" and match.status != "completed":
