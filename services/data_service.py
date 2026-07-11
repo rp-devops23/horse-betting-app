@@ -675,15 +675,29 @@ class DataService:
     def update_race_day_odds(self, date_str: str, odds_data: dict) -> int:
         """Update horse Win odds from smspariaz data without touching bets.
 
+        Odds are frozen for the entire race day once any race has a result,
+        meaning the last update before the first race starts is the one that counts.
+
         Args:
             date_str: Race date in YYYY-MM-DD format.
             odds_data: {race_number (int): {horse_number (int): odds (float)}}
 
         Returns:
-            Number of horses whose odds were updated.
+            Number of horses whose odds were updated (0 if odds are frozen).
         """
         count = 0
         try:
+            # Freeze all odds once any race on this day has a result
+            any_completed = Race.query.filter_by(date=date_str).filter(
+                Race.winner_horse_number.isnot(None)
+            ).first()
+            if any_completed:
+                logger.info(
+                    "update_race_day_odds: odds frozen for %s (race %d has a result)",
+                    date_str, any_completed.race_number,
+                )
+                return 0
+
             for race_number, horse_odds in odds_data.items():
                 race = Race.query.filter_by(
                     date=date_str, race_number=int(race_number)
