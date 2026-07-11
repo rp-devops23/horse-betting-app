@@ -126,15 +126,21 @@ const RaceDayTab = ({
     if (payload.stall_number !== '') payload.stall_number = parseInt(payload.stall_number) || null;
     else payload.stall_number = null;
     try {
-      await fetch(`${API_BASE}/races/${raceId}/horses/${horseNumber}`, {
+      const res = await fetch(`${API_BASE}/races/${raceId}/horses/${horseNumber}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert(err.error || 'Erreur lors de la sauvegarde');
+        return;
+      }
       setEditingHorse(null);
       selectedRaceDay ? fetchRaceDayData(selectedRaceDay) : fetchAllData();
     } catch (e) {
       console.error('Error updating horse:', e);
+      alert('Erreur réseau');
     }
   };
 
@@ -577,9 +583,9 @@ const RaceDayTab = ({
                               </label>
                             </div>
                             <div className="flex justify-end gap-2 mt-2">
-                              <button onClick={() => setEditingHorse(null)}
+                              <button type="button" onClick={() => setEditingHorse(null)}
                                 className="px-3 py-1 text-xs text-gray-500 hover:bg-gray-200 rounded">Annuler</button>
-                              <button onClick={handleSaveHorse}
+                              <button type="button" onClick={handleSaveHorse}
                                 className="px-3 py-1 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700 flex items-center gap-1">
                                 <Check className="w-3 h-3" /> Sauvegarder
                               </button>
