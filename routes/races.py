@@ -115,6 +115,20 @@ def refresh_scores():
         print(f"[ERROR] /races/refresh-scores: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
+@races_bp.route('/races/<race_id>/horses/<int:horse_number>', methods=['PUT'])
+def update_horse(race_id, horse_number):
+    """Updates any editable fields on a horse (admin only)."""
+    try:
+        fields = _json()
+        if not fields:
+            return jsonify({"error": "No fields provided"}), 400
+        if data_service.update_horse(race_id, horse_number, fields):
+            return jsonify({"success": True}), 200
+        return jsonify({"error": "Horse not found"}), 404
+    except Exception as e:
+        print(f"[ERROR] /races/{race_id}/horses/{horse_number}: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
 @races_bp.route('/races/<race_id>/horses/<int:horse_number>/odds', methods=['PUT'])
 def update_horse_odds(race_id, horse_number):
     """Updates the odds for a specific horse (admin only)."""

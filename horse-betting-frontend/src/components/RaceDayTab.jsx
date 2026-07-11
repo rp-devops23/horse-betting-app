@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, ChevronDown, Trophy, Edit3, X, Star, Check, AlertCircle, Flag, Lock } from 'lucide-react';
+import { Calendar, ChevronDown, Trophy, Edit3, X, Star, Check, AlertCircle, Flag, Lock, Pencil } from 'lucide-react';
 import API_BASE from '../config';
 import { initials, getUserColour } from '../utils/userColors';
 
@@ -34,6 +34,7 @@ const RaceDayTab = ({
   const [editingRaceWinner, setEditingRaceWinner] = useState(null);
   const [editingLastHorse, setEditingLastHorse] = useState(null);
   const [editingOdds, setEditingOdds] = useState(null); // { raceId, horseNumber, value }
+  const [editingHorse, setEditingHorse] = useState(null); // { raceId, horseNumber, ...fields }
   const [raceDayScores, setRaceDayScores] = useState([]);
   const [loadingScores, setLoadingScores] = useState(false);
 
@@ -97,6 +98,43 @@ const RaceDayTab = ({
       }
     } catch (e) {
       console.error('Error toggling scratch:', e);
+    }
+  };
+
+  const handleStartEditHorse = (raceId, horse) => {
+    setEditingHorse({
+      raceId, horseNumber: horse.number,
+      name: horse.name || '', odds: horse.odds || '',
+      jockey: horse.jockey || '', trainer: horse.trainer || '',
+      weight_kg: horse.weight_kg || '', age: horse.age || '',
+      form: horse.form || '', stall_number: horse.stall ?? '',
+    });
+    setEditingOdds(null);
+  };
+
+  const handleSaveHorse = async () => {
+    if (!editingHorse) return;
+    const { raceId, horseNumber, ...fields } = editingHorse;
+    // Convert numeric fields
+    const payload = { ...fields };
+    if (payload.odds !== '') payload.odds = parseFloat(payload.odds) || 0;
+    else delete payload.odds;
+    if (payload.weight_kg !== '') payload.weight_kg = parseFloat(payload.weight_kg) || null;
+    else payload.weight_kg = null;
+    if (payload.age !== '') payload.age = parseInt(payload.age) || null;
+    else payload.age = null;
+    if (payload.stall_number !== '') payload.stall_number = parseInt(payload.stall_number) || null;
+    else payload.stall_number = null;
+    try {
+      await fetch(`${API_BASE}/races/${raceId}/horses/${horseNumber}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      setEditingHorse(null);
+      selectedRaceDay ? fetchRaceDayData(selectedRaceDay) : fetchAllData();
+    } catch (e) {
+      console.error('Error updating horse:', e);
     }
   };
 
@@ -467,16 +505,86 @@ const RaceDayTab = ({
                           </div>
                         </button>
 
-                        {/* Admin scratch toggle */}
+                        {/* Admin controls: edit + scratch */}
                         {isAdmin && (
-                          <button
-                            onClick={() => handleToggleScratch(race.id, horse.number)}
-                            className={`absolute top-2 right-2 text-xs px-1.5 py-0.5 rounded transition-colors ${
-                              isScratched ? 'bg-red-100 text-red-600 hover:bg-red-200' : 'bg-gray-100 text-gray-400 hover:bg-orange-100 hover:text-orange-600'
-                            }`}
-                          >
-                            {isScratched ? 'Rétablir' : 'NP'}
-                          </button>
+                          <div className="absolute top-2 right-2 flex items-center gap-1">
+                            <button
+                              onClick={() => editingHorse?.raceId === race.id && editingHorse?.horseNumber === horse.number
+                                ? setEditingHorse(null)
+                                : handleStartEditHorse(race.id, horse)}
+                              className={`text-xs px-1.5 py-0.5 rounded transition-colors ${
+                                editingHorse?.raceId === race.id && editingHorse?.horseNumber === horse.number
+                                  ? 'bg-indigo-200 text-indigo-700' : 'bg-gray-100 text-gray-400 hover:bg-indigo-100 hover:text-indigo-600'
+                              }`}
+                              title="Modifier le cheval"
+                            >
+                              <Pencil className="w-3 h-3" />
+                            </button>
+                            <button
+                              onClick={() => handleToggleScratch(race.id, horse.number)}
+                              className={`text-xs px-1.5 py-0.5 rounded transition-colors ${
+                                isScratched ? 'bg-red-100 text-red-600 hover:bg-red-200' : 'bg-gray-100 text-gray-400 hover:bg-orange-100 hover:text-orange-600'
+                              }`}
+                            >
+                              {isScratched ? 'Rétablir' : 'NP'}
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Admin inline edit form */}
+                        {isAdmin && editingHorse?.raceId === race.id && editingHorse?.horseNumber === horse.number && (
+                          <div className="px-4 py-3 bg-indigo-50 border-t border-indigo-100" onClick={e => e.stopPropagation()}>
+                            <div className="grid grid-cols-2 gap-2 text-sm">
+                              <label className="flex flex-col col-span-2">
+                                <span className="text-xs text-gray-500 mb-0.5">Nom</span>
+                                <input value={editingHorse.name} onChange={e => setEditingHorse(p => ({...p, name: e.target.value}))}
+                                  className="px-2 py-1 border border-gray-300 rounded text-gray-800" />
+                              </label>
+                              <label className="flex flex-col">
+                                <span className="text-xs text-gray-500 mb-0.5">Cote</span>
+                                <input type="number" step="0.1" min="0" value={editingHorse.odds} onChange={e => setEditingHorse(p => ({...p, odds: e.target.value}))}
+                                  className="px-2 py-1 border border-gray-300 rounded text-gray-800" />
+                              </label>
+                              <label className="flex flex-col">
+                                <span className="text-xs text-gray-500 mb-0.5">Couloir</span>
+                                <input type="number" min="1" value={editingHorse.stall_number} onChange={e => setEditingHorse(p => ({...p, stall_number: e.target.value}))}
+                                  className="px-2 py-1 border border-gray-300 rounded text-gray-800" />
+                              </label>
+                              <label className="flex flex-col">
+                                <span className="text-xs text-gray-500 mb-0.5">Jockey</span>
+                                <input value={editingHorse.jockey} onChange={e => setEditingHorse(p => ({...p, jockey: e.target.value}))}
+                                  className="px-2 py-1 border border-gray-300 rounded text-gray-800" />
+                              </label>
+                              <label className="flex flex-col">
+                                <span className="text-xs text-gray-500 mb-0.5">Écurie</span>
+                                <input value={editingHorse.trainer} onChange={e => setEditingHorse(p => ({...p, trainer: e.target.value}))}
+                                  className="px-2 py-1 border border-gray-300 rounded text-gray-800" />
+                              </label>
+                              <label className="flex flex-col">
+                                <span className="text-xs text-gray-500 mb-0.5">Poids (kg)</span>
+                                <input type="number" step="0.5" min="0" value={editingHorse.weight_kg} onChange={e => setEditingHorse(p => ({...p, weight_kg: e.target.value}))}
+                                  className="px-2 py-1 border border-gray-300 rounded text-gray-800" />
+                              </label>
+                              <label className="flex flex-col">
+                                <span className="text-xs text-gray-500 mb-0.5">Âge</span>
+                                <input type="number" min="1" value={editingHorse.age} onChange={e => setEditingHorse(p => ({...p, age: e.target.value}))}
+                                  className="px-2 py-1 border border-gray-300 rounded text-gray-800" />
+                              </label>
+                              <label className="flex flex-col col-span-2">
+                                <span className="text-xs text-gray-500 mb-0.5">Forme</span>
+                                <input value={editingHorse.form} onChange={e => setEditingHorse(p => ({...p, form: e.target.value}))}
+                                  className="px-2 py-1 border border-gray-300 rounded text-gray-800 font-mono" />
+                              </label>
+                            </div>
+                            <div className="flex justify-end gap-2 mt-2">
+                              <button onClick={() => setEditingHorse(null)}
+                                className="px-3 py-1 text-xs text-gray-500 hover:bg-gray-200 rounded">Annuler</button>
+                              <button onClick={handleSaveHorse}
+                                className="px-3 py-1 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700 flex items-center gap-1">
+                                <Check className="w-3 h-3" /> Sauvegarder
+                              </button>
+                            </div>
+                          </div>
                         )}
                       </div>
                     );

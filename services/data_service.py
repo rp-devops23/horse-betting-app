@@ -301,6 +301,23 @@ class DataService:
             db.session.rollback()
             return False
 
+    def update_horse(self, race_id: str, horse_number: int, fields: dict) -> bool:
+        """Updates any editable fields on a horse."""
+        ALLOWED = {'name', 'odds', 'jockey', 'trainer', 'weight_kg', 'age', 'form', 'stall_number'}
+        try:
+            horse = Horse.query.filter_by(race_id=race_id, horse_number=horse_number).first()
+            if not horse:
+                return False
+            for key, value in fields.items():
+                if key in ALLOWED:
+                    setattr(horse, key, value)
+            db.session.commit()
+            return True
+        except Exception as e:
+            logger.error(f"Error updating horse: {e}")
+            db.session.rollback()
+            return False
+
     def delete_race_day(self, race_date: str) -> bool:
         """Deletes a race day and all its associated data (races, horses, bets, scores)."""
         try:
