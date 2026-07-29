@@ -4,13 +4,13 @@ import { BarChart3 } from 'lucide-react';
 import API_BASE from '../config';
 
 const COLUMNS = [
-  { key: 'crowns',       label: 'Couronnes',       format: v => v != null ? `${v}` : '-' },
+  { key: 'crowns',       label: 'Jours gagnants',   format: v => v != null ? `${v}` : '-' },
   { key: 'winRate',      label: 'Taux victoire',   format: v => v != null ? `${v}%` : '-' },
   { key: 'bankerRate',   label: 'Taux banker',     format: v => v != null ? `${v}%` : '-' },
   { key: 'totalBets',    label: 'Paris total',     format: v => v != null ? `${v}` : '-' },
   { key: 'bestDay',      label: 'Meilleur jour',   format: v => v != null ? `${v} pts` : '-' },
   { key: 'avgPerDay',    label: 'Moy/jour',        format: v => v != null ? `${v}` : '-' },
-  { key: 'biggestUpset', label: 'Plus gros outsider',  format: v => v != null ? `${v}x` : '-' },
+  { key: 'biggestUpset', label: 'Plus gros outsider',  format: (v, player) => v != null ? `${player?.biggestUpsetName || '?'} (${v})` : '-' },
   { key: 'daysPlayed',   label: 'Jours joués',     format: v => v != null ? `${v}` : '-' },
 ];
 
@@ -98,17 +98,14 @@ const StatsTab = ({ showMessage }) => {
                   className="border-b border-gray-100 group"
                 >
                   <td className={`sticky left-0 z-10 px-4 py-3 font-semibold text-gray-800 min-w-[130px] ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} group-hover:bg-indigo-50`}>
-                    <div className="flex items-center gap-1">
-                      {player.name}
-                      {player.crowns > 0 && <span className="text-yellow-500 ml-1">{'👑'.repeat(Math.min(player.crowns, 3))}{player.crowns > 3 ? `+${player.crowns - 3}` : ''}</span>}
-                    </div>
+                    {player.name}
                   </td>
                   {COLUMNS.map(col => {
                     const val = player[col.key];
                     const isBest = val != null && val > 0 && val === bests[col.key];
                     return (
                       <td key={col.key} className={`px-4 py-3 text-center whitespace-nowrap ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} group-hover:bg-indigo-50 ${isBest ? 'text-indigo-700 font-bold' : 'text-gray-700'}`}>
-                        {col.format(val)}
+                        {col.format(val, player)}
                       </td>
                     );
                   })}

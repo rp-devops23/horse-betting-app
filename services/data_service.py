@@ -689,6 +689,7 @@ class DataService:
             banker_total = 0
             banker_wins = 0
             biggest_upset = None
+            biggest_upset_name = None
 
             for bet in user_bets:
                 race = race_map.get(bet.race_id)
@@ -700,6 +701,7 @@ class DataService:
                     horse = horse_map.get((race.id, bet.horse_number))
                     if horse and (biggest_upset is None or horse.odds > biggest_upset):
                         biggest_upset = horse.odds
+                        biggest_upset_name = horse.name
                 if bet.is_banker:
                     banker_total += 1
                     if is_win:
@@ -722,12 +724,13 @@ class DataService:
                 "userId": uid,
                 "name": user.name,
                 "crowns": crown_counts.get(uid, 0),
-                "winRate": round(winning_bets / total_bets * 100, 1) if total_bets > 0 else 0.0,
-                "bankerRate": round(banker_wins / banker_total * 100, 1) if banker_total > 0 else None,
+                "winRate": round(winning_bets / total_bets * 100) if total_bets > 0 else 0,
+                "bankerRate": round(banker_wins / banker_total * 100) if banker_total > 0 else None,
                 "totalBets": total_bets,
                 "bestDay": best_day,
                 "avgPerDay": avg_per_day,
                 "biggestUpset": biggest_upset,
+                "biggestUpsetName": biggest_upset_name,
                 "daysPlayed": days_played,
             })
 
