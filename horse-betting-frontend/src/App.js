@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Trophy, Settings, Home, Calendar, Globe } from 'lucide-react';
+import { Trophy, Settings, Home, Calendar } from 'lucide-react';
 
 import HomePage from './components/HomePage.jsx';
 import RaceDayTab from './components/RaceDayTab.jsx';
 import LeaderboardTab from './components/LeaderboardTab.jsx';
 import AdminTab from './components/AdminTab.jsx';
-import WorldCupTab from './components/WorldCupTab.jsx'; // World Cup (temporary)
 
 import API_BASE from './config';
 import { BADGE_COLOURS, initials, getUserColour } from './utils/userColors';
@@ -447,7 +446,6 @@ const HorseBettingApp = () => {
           {[
             { id: 'home', label: 'Accueil', Icon: Home },
             { id: 'races', label: 'Courses', Icon: Calendar },
-            { id: 'worldcup', label: 'Mondial', Icon: Globe },
             { id: 'leaderboard', label: 'Classement', Icon: Trophy },
             ...(isAdminAuthenticated ? [{ id: 'admin', label: 'Admin', Icon: Settings }] : []),
           ].map(({ id, label, Icon }) => (
@@ -569,10 +567,6 @@ const HorseBettingApp = () => {
                   <Calendar className="inline-block w-5 h-5 mr-2" />
                   Courses
                 </button>
-                <button onClick={() => handleTabChange('worldcup')} className={`py-3 px-6 rounded-md transition-colors duration-200 font-semibold ${activeTab === 'worldcup' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-600 hover:text-indigo-700'}`}>
-                  <Globe className="inline-block w-5 h-5 mr-2" />
-                  Mondial
-                </button>
                 <button onClick={() => handleTabChange('leaderboard')} className={`py-3 px-6 rounded-md transition-colors duration-200 font-semibold ${activeTab === 'leaderboard' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-600 hover:text-indigo-700'}`}>
                   <Trophy className="inline-block w-5 h-5 mr-2" />
                   Classement
@@ -609,14 +603,6 @@ const HorseBettingApp = () => {
               />
             )}
 
-            {activeTab === 'worldcup' && (
-              <WorldCupTab
-                users={users}
-                selectedUserId={selectedUserId}
-                isAdmin={isAdminAuthenticated}
-                showMessage={showMessage}
-              />
-            )}
 
             {activeTab === 'leaderboard' && (
               <LeaderboardTab users={users} showMessage={showMessage} />
