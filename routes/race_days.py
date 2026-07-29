@@ -42,6 +42,12 @@ def get_leaderboard():
     leaderboard_data = data_service.get_leaderboard_data()
     return jsonify({"success": True, "leaderboard": leaderboard_data.get("users", [])})
 
+@race_days_bp.route('/stats', methods=['GET'])
+def get_all_stats():
+    """Get all-time stats for all players."""
+    stats = data_service.get_all_stats()
+    return jsonify({"success": True, "stats": stats})
+
 @race_days_bp.route('/leaderboard/current', methods=['GET'])
 def get_current_leaderboard():
     """Get current day leaderboard data."""

@@ -625,6 +625,115 @@ class DataService:
             "type": "overall"
         }
 
+    # --- All-Time Stats ---
+
+    def get_all_stats(self) -> List[Dict[str, Any]]:
+        """Compute all-time stats for every user in a handful of bulk queries."""
+        users = User.query.all()
+        if not users:
+            return []
+
+        # All completed races keyed by id
+        completed_races = Race.query.filter(
+            Race.status == 'completed',
+            Race.winner_horse_number.isnot(None),
+        ).all()
+        race_map = {r.id: r for r in completed_races}
+        completed_race_ids = set(race_map.keys())
+
+        # All bets on completed races
+        all_bets = Bet.query.filter(Bet.race_id.in_(completed_race_ids)).all() if completed_race_ids else []
+
+        # Horses for completed races (to look up odds of winners)
+        all_horses = Horse.query.filter(Horse.race_id.in_(completed_race_ids)).all() if completed_race_ids else []
+        # key: (race_id, horse_number) -> Horse
+        horse_map = {(h.race_id, h.horse_number): h for h in all_horses}
+
+        # All user scores
+        all_scores = UserScore.query.all()
+
+        # --- Pre-compute crowns: per race_date, who had max score? ---
+        from collections import defaultdict
+        scores_by_date = defaultdict(list)  # date -> [(user_id, score)]
+        for s in all_scores:
+            scores_by_date[s.race_date].append((s.user_id, s.score))
+
+        crown_counts = defaultdict(int)
+        for date, entries in scores_by_date.items():
+            if not entries:
+                continue
+            max_score = max(sc for _, sc in entries)
+            if max_score <= 0:
+                continue
+            for uid, sc in entries:
+                if sc == max_score:
+                    crown_counts[uid] += 1
+
+        # --- Group bets and scores by user ---
+        bets_by_user = defaultdict(list)
+        for b in all_bets:
+            bets_by_user[b.user_id].append(b)
+
+        scores_by_user = defaultdict(list)
+        for s in all_scores:
+            scores_by_user[s.user_id].append(s)
+
+        results = []
+        for user in users:
+            uid = user.id
+            user_bets = bets_by_user[uid]
+            user_scores = scores_by_user[uid]
+
+            total_bets = len(user_bets)
+            winning_bets = 0
+            banker_total = 0
+            banker_wins = 0
+            biggest_upset = None
+
+            for bet in user_bets:
+                race = race_map.get(bet.race_id)
+                if not race:
+                    continue
+                is_win = race.winner_horse_number == bet.horse_number
+                if is_win:
+                    winning_bets += 1
+                    horse = horse_map.get((race.id, bet.horse_number))
+                    if horse and (biggest_upset is None or horse.odds > biggest_upset):
+                        biggest_upset = horse.odds
+                if bet.is_banker:
+                    banker_total += 1
+                    if is_win:
+                        banker_wins += 1
+
+            score_values = [s.score for s in user_scores]
+            best_day = max(score_values) if score_values else 0
+            avg_per_day = round(sum(score_values) / len(score_values), 1) if score_values else 0.0
+            days_played = len(set(s.race_date for s in user_scores if s.score > 0 or any(b.race_id in completed_race_ids for b in bets_by_user[uid])))
+
+            # Use distinct race dates from bets for days_played (more accurate)
+            bet_dates = set()
+            for b in user_bets:
+                race = race_map.get(b.race_id)
+                if race:
+                    bet_dates.add(race.date)
+            days_played = len(bet_dates)
+
+            results.append({
+                "userId": uid,
+                "name": user.name,
+                "crowns": crown_counts.get(uid, 0),
+                "winRate": round(winning_bets / total_bets * 100, 1) if total_bets > 0 else 0.0,
+                "bankerRate": round(banker_wins / banker_total * 100, 1) if banker_total > 0 else None,
+                "totalBets": total_bets,
+                "bestDay": best_day,
+                "avgPerDay": avg_per_day,
+                "biggestUpset": biggest_upset,
+                "daysPlayed": days_played,
+            })
+
+        results.sort(key=lambda x: (-x["crowns"], -x["avgPerDay"]))
+        return results
+
     # --- Backup / Restore ---
 
     def backup_all_data(self) -> Dict[str, Any]:

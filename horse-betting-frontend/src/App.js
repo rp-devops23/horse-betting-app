@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Trophy, Settings, Home, Calendar } from 'lucide-react';
+import { Trophy, Settings, Home, Calendar, BarChart3 } from 'lucide-react';
 
 import HomePage from './components/HomePage.jsx';
 import RaceDayTab from './components/RaceDayTab.jsx';
 import LeaderboardTab from './components/LeaderboardTab.jsx';
 import AdminTab from './components/AdminTab.jsx';
+import StatsTab from './components/StatsTab.jsx';
 
 import API_BASE from './config';
 import { BADGE_COLOURS, initials, getUserColour } from './utils/userColors';
@@ -447,6 +448,7 @@ const HorseBettingApp = () => {
             { id: 'home', label: 'Accueil', Icon: Home },
             { id: 'races', label: 'Courses', Icon: Calendar },
             { id: 'leaderboard', label: 'Classement', Icon: Trophy },
+            { id: 'stats', label: 'Stats', Icon: BarChart3 },
             ...(isAdminAuthenticated ? [{ id: 'admin', label: 'Admin', Icon: Settings }] : []),
           ].map(({ id, label, Icon }) => (
             <button
@@ -571,6 +573,10 @@ const HorseBettingApp = () => {
                   <Trophy className="inline-block w-5 h-5 mr-2" />
                   Classement
                 </button>
+                <button onClick={() => handleTabChange('stats')} className={`py-3 px-6 rounded-md transition-colors duration-200 font-semibold ${activeTab === 'stats' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-600 hover:text-indigo-700'}`}>
+                  <BarChart3 className="inline-block w-5 h-5 mr-2" />
+                  Stats
+                </button>
                 {isAdminAuthenticated && (
                   <button onClick={() => handleTabChange('admin')} className={`py-3 px-6 rounded-md transition-colors duration-200 font-semibold ${activeTab === 'admin' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-600 hover:text-indigo-700'}`}>
                     <Settings className="inline-block w-5 h-5 mr-2" />
@@ -606,6 +612,10 @@ const HorseBettingApp = () => {
 
             {activeTab === 'leaderboard' && (
               <LeaderboardTab users={users} showMessage={showMessage} />
+            )}
+
+            {activeTab === 'stats' && (
+              <StatsTab showMessage={showMessage} />
             )}
 
             {activeTab === 'admin' && isAdminAuthenticated && (
