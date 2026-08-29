@@ -9,7 +9,9 @@ admin_bp = Blueprint('admin', __name__)
 def admin_login():
     """Validates admin password against ADMIN_PASSWORD env var."""
     password = request.json.get('password', '')
-    expected = os.getenv('ADMIN_PASSWORD', 'admin123')
+    expected = os.getenv('ADMIN_PASSWORD')
+    if not expected:
+        raise RuntimeError("ADMIN_PASSWORD environment variable is not set")
     if password == expected:
         return jsonify({"success": True}), 200
     return jsonify({"success": False, "error": "Invalid password"}), 401

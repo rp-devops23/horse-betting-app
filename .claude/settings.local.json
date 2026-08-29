@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:www.supertote.mu)",
+      "Bash(cd:*)",
+      "WebFetch(domain:lekours.vercel.app)",
+      "Bash(curl:*)",
+      "WebFetch(domain:horse-betting-app-1.onrender.com)",
+      "Bash(ls:*)",
+      "Bash(python:*)",
+      "Bash(grep:*)",
+      "WebFetch(domain:api.football-data.org)",
+      "WebFetch(domain:v3.football.api-sports.io)",
+      "WebFetch(domain:worldcupjson.net)",
+      "WebFetch(domain:site.api.espn.com)",
+      "Bash(git add:*)",
+      "Bash(git push:*)"
+    ]
+  }
+}
