@@ -12,9 +12,12 @@ from dotenv import load_dotenv
 load_dotenv()
 
 database_url = os.getenv('DATABASE_URL', '')
-# Render provides 'postgres://' but SQLAlchemy requires 'postgresql://'
-if database_url.startswith('postgres://'):
-    database_url = database_url.replace('postgres://', 'postgresql://', 1)
+# Render provides 'postgres://'. Name the psycopg2 driver explicitly: SQLAlchemy 2.1
+# defaults 'postgresql://' to psycopg (v3), which isn't installed.
+for prefix in ('postgres://', 'postgresql://'):
+    if database_url.startswith(prefix):
+        database_url = 'postgresql+psycopg2://' + database_url[len(prefix):]
+        break
 
 # Import our database initialization
 from database import init_db, create_tables
