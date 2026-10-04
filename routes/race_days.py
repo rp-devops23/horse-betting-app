@@ -1,6 +1,7 @@
 # routes/race_days.py (Updated - Using DataService)
+import re
 from flask import Blueprint, jsonify, request
-from services import data_service
+from services import data_service, season_service
 from auth import current_user_id
 
 race_days_bp = Blueprint('race_days', __name__)
@@ -39,9 +40,25 @@ def get_current_race_day():
 
 @race_days_bp.route('/leaderboard', methods=['GET'])
 def get_leaderboard():
-    """Get overall leaderboard data."""
-    leaderboard_data = data_service.get_leaderboard_data()
-    return jsonify({"success": True, "leaderboard": leaderboard_data.get("users", [])})
+    """Standings for a period: ?period=all (default) | YYYY | YYYY-MM."""
+    period = request.args.get('period', 'all')
+    if period != 'all' and not re.fullmatch(r'\d{4}(-\d{2})?', period):
+        return jsonify({"success": False, "error": "Invalid period"}), 400
+    data = season_service.get_standings(period)
+    return jsonify({"success": True, "leaderboard": data['standings'], "label": data['label'], "period": period})
+
+@race_days_bp.route('/seasons', methods=['GET'])
+def get_seasons():
+    """Monthly seasons with their leader / champions."""
+    return jsonify({"success": True, **season_service.get_seasons()})
+
+@race_days_bp.route('/players/<user_id>/profile', methods=['GET'])
+def get_player_profile(user_id):
+    """Profile, form, head-to-head and trophies for one player."""
+    profile = season_service.get_player_profile(user_id)
+    if not profile:
+        return jsonify({"success": False, "error": "Player not found"}), 404
+    return jsonify({"success": True, **profile})
 
 @race_days_bp.route('/stats', methods=['GET'])
 def get_all_stats():

@@ -763,41 +763,6 @@ class DataService:
         
         return scores
 
-    def get_leaderboard_data(self) -> Dict[str, Any]:
-        """Get overall leaderboard data from the database across all race days."""
-        from models import User, UserScore
-        from database import db
-        
-        # Get all users
-        users = User.query.all()
-        total_scores = []
-        
-        for user in users:
-            # Get all user scores across all race days
-            user_scores = UserScore.query.filter_by(user_id=user.id).all()
-            total_score = sum(score.score for score in user_scores)
-            total_wins = sum(score.wins or 0 for score in user_scores)
-
-            total_scores.append({
-                "userId": user.id,
-                "name": user.name,
-                "score": total_score,
-                "wins": total_wins,
-            })
-        
-        # Sort by total score (descending)
-        total_scores.sort(key=lambda x: x['score'], reverse=True)
-        
-        # Add rank
-        for i, score_entry in enumerate(total_scores):
-            score_entry['rank'] = i + 1
-        
-        return {
-            "users": total_scores,
-            "date": "all-time",
-            "type": "overall"
-        }
-
     # --- All-Time Stats ---
 
     def get_all_stats(self) -> List[Dict[str, Any]]:
