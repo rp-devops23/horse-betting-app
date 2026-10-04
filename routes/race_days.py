@@ -1,10 +1,12 @@
 # routes/race_days.py (Updated - Using DataService)
+import logging
 import re
 from flask import Blueprint, jsonify, request
 from services import data_service, season_service
 from auth import current_user_id
 
 race_days_bp = Blueprint('race_days', __name__)
+logger = logging.getLogger(__name__)
 
 @race_days_bp.route('/index', methods=['GET'])
 def get_race_days():
@@ -39,18 +41,30 @@ def get_leaderboard():
     period = request.args.get('period', 'all')
     if period != 'all' and not re.fullmatch(r'\d{4}(-\d{2})?', period):
         return jsonify({"success": False, "error": "Invalid period"}), 400
-    data = season_service.get_standings(period)
+    try:
+        data = season_service.get_standings(period)
+    except Exception as e:
+        logger.exception("leaderboard failed")
+        return jsonify({"success": False, "error": f"Erreur du classement : {e}"}), 500
     return jsonify({"success": True, "leaderboard": data['standings'], "label": data['label'], "period": period})
 
 @race_days_bp.route('/seasons', methods=['GET'])
 def get_seasons():
     """Monthly seasons with their leader / champions."""
-    return jsonify({"success": True, **season_service.get_seasons()})
+    try:
+        return jsonify({"success": True, **season_service.get_seasons()})
+    except Exception as e:
+        logger.exception("seasons failed")
+        return jsonify({"success": False, "error": f"Erreur des saisons : {e}"}), 500
 
 @race_days_bp.route('/players/<user_id>/profile', methods=['GET'])
 def get_player_profile(user_id):
     """Profile, form, head-to-head and trophies for one player."""
-    profile = season_service.get_player_profile(user_id)
+    try:
+        profile = season_service.get_player_profile(user_id)
+    except Exception as e:
+        logger.exception("profile failed")
+        return jsonify({"success": False, "error": f"Erreur du profil : {e}"}), 500
     if not profile:
         return jsonify({"success": False, "error": "Player not found"}), 404
     return jsonify({"success": True, **profile})

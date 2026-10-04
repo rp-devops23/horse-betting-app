@@ -61,7 +61,8 @@ def create_app():
     @app.route('/')
     def index():
         """Returns the main application status."""
-        return jsonify({"status": "OK", "message": "Horse racing betting API is running."})
+        return jsonify({"status": "OK", "message": "Horse racing betting API is running.",
+                        "version": (os.getenv('RENDER_GIT_COMMIT') or 'local')[:7]})
 
     return app
 
@@ -93,9 +94,6 @@ def apply_migrations(app):
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar VARCHAR",
         # PINs are now stored hashed
         "ALTER TABLE users ALTER COLUMN pin TYPE VARCHAR(255)",
-        # World Cup penalty columns (temporary)
-        "ALTER TABLE wc_matches ADD COLUMN IF NOT EXISTS penalty_winner VARCHAR",
-        "ALTER TABLE wc_bets ADD COLUMN IF NOT EXISTS predicted_pen_winner VARCHAR",
     ]
     with app.app_context():
         with db.engine.connect() as conn:
@@ -104,6 +102,9 @@ def apply_migrations(app):
                     conn.execute(text(sql))
                     conn.commit()
                 except Exception as e:
+                    # A failed statement aborts the transaction on Postgres; roll back
+                    # so the following migrations still run.
+                    conn.rollback()
                     print(f"[Migration] {sql[:50]}... -> {e}")
 
 apply_migrations(app)
@@ -111,9 +112,12 @@ apply_migrations(app)
 # Hash any legacy plaintext PINs (no-op once done)
 with app.app_context():
     from services import data_service
-    _upgraded = data_service.hash_plaintext_pins()
-    if _upgraded:
-        print(f"[Migration] Hashed {_upgraded} plaintext PIN(s)")
+    try:
+        _upgraded = data_service.hash_plaintext_pins()
+        if _upgraded:
+            print(f"[Migration] Hashed {_upgraded} plaintext PIN(s)")
+    except Exception as e:
+        print(f"[Migration] PIN hashing skipped -> {e}")
 
 if __name__ == '__main__':
 

@@ -10,6 +10,8 @@ Seasons are calendar months (Mauritius time). A month's champion is crowned
 once the month is over.
 """
 
+import logging
+import re
 from collections import defaultdict
 from datetime import datetime
 from typing import Any, Dict, List, Optional
@@ -34,6 +36,11 @@ ACHIEVEMENTS = [
     ('centurion',   '💯', 'Centurion',        'Atteindre 100 points au total', 100),
     ('red_lantern', '🐢', 'Lanterne rouge',   'Choisir 3 fois le cheval arrivé dernier', 3),
 ]
+
+
+logger = logging.getLogger(__name__)
+
+DATE_RE = re.compile(r'^\d{4}-\d{2}-\d{2}$')
 
 
 def month_label(period: str) -> str:
@@ -68,14 +75,16 @@ class History:
     def __init__(self):
         self.users = {u.id: u for u in User.query.all()}
         races = Race.query.filter(Race.winner_horse_number.isnot(None)).all()
-        self.races = {r.id: r for r in races}
+        # Ignore races with a malformed date rather than failing every page
+        self.races = {r.id: r for r in races if r.date and DATE_RE.match(r.date)}
         race_ids = list(self.races)
         self.horses = {}
         self.bets = []
         if race_ids:
             self.horses = {(h.race_id, h.horse_number): h
                            for h in Horse.query.filter(Horse.race_id.in_(race_ids)).all()}
-            self.bets = Bet.query.filter(Bet.race_id.in_(race_ids)).all()
+            self.bets = [b for b in Bet.query.filter(Bet.race_id.in_(race_ids)).all()
+                         if b.user_id in self.users]
 
         # Per-day participation and scores
         self.participants = defaultdict(set)  # date -> {user_id}
@@ -91,7 +100,7 @@ class History:
             self.day_wins[date] = {}
             for uid in self.participants[date]:
                 s = stored.get((uid, date))
-                self.day_scores[date][uid] = s.score if s else 0
+                self.day_scores[date][uid] = (s.score or 0) if s else 0
                 self.day_wins[date][uid] = (s.wins or 0) if s else 0
 
     def bets_of(self, user_id: str) -> List[Bet]:
@@ -167,9 +176,9 @@ class History:
             won = race.winner_horse_number == bet.horse_number
             horse = self.horses.get((race.id, bet.horse_number))
             if won:
-                odds = horse.odds if horse else 0
+                odds = (horse.odds or 0) if horse else 0
                 winning_odds.append(odds)
-                if horse and (biggest is None or odds > biggest['odds']):
+                if horse and odds and (biggest is None or odds > biggest['odds']):
                     biggest = {'horse': horse.name, 'odds': odds, 'date': race.date}
             elif race.last_horse_number == bet.horse_number:
                 last_picks += 1
@@ -258,7 +267,8 @@ class SeasonService:
         h = History()
         current = _current_month()
         champions = h.month_champions()
-        race_months = {r[0][:7] for r in Race.query.with_entities(Race.date).distinct().all()}
+        race_months = {r[0][:7] for r in Race.query.with_entities(Race.date).distinct().all()
+                       if r[0] and DATE_RE.match(r[0])}
         months = sorted(race_months | {current}, reverse=True)
         seasons = []
         for month in months:
