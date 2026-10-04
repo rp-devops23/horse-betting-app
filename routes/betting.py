@@ -2,91 +2,55 @@
 from flask import Blueprint, jsonify, request
 import logging
 from services import data_service
+from auth import require_user, current_user_id
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 betting_bp = Blueprint('betting', __name__)
 
-@betting_bp.route('/bet', methods=['POST'])
-def place_bet():
-    """Place a regular bet for a user on a specific horse."""
-    data = request.json
-    user_id = data.get('userId')
+def _place(is_banker):
+    from models import Race
+    data = request.get_json(silent=True) or {}
+    user_id = current_user_id()
     race_id = data.get('raceId')
     horse_number = data.get('horseNumber')
 
-    if not all([user_id, race_id, horse_number]):
-        return jsonify({"error": "Missing required fields: userId, raceId, horseNumber"}), 400
+    if not all([race_id, horse_number]):
+        return jsonify({"success": False, "error": "Missing required fields: raceId, horseNumber"}), 400
+    if data.get('userId') and str(data['userId']) != str(user_id):
+        return jsonify({"success": False, "error": "Tu ne peux parier que pour toi-même"}), 403
 
-    success = data_service.place_bet(user_id, race_id, horse_number, is_banker=False)
-    if success:
-        return jsonify({"success": True, "message": f"Bet placed for user {user_id} on horse {horse_number} in race {race_id}"}), 200
-    else:
-        # Check if race is completed to provide specific error message
-        from models import Race
-        race = Race.query.get(race_id)
-        if race and race.status == 'completed':
-            return jsonify({"success": False, "error": "Cannot place bet on completed race"}), 400
-        else:
-            return jsonify({"success": False, "error": "Failed to place bet"}), 500
+    race = Race.query.get(race_id)
+    if not race:
+        return jsonify({"success": False, "error": "Race not found"}), 404
+    lock_error = data_service.bet_lock_error(race, bool(is_banker))
+    if lock_error:
+        return jsonify({"success": False, "error": lock_error}), 400
+
+    if data_service.place_bet(user_id, race_id, int(horse_number), is_banker=is_banker):
+        return jsonify({"success": True}), 200
+    return jsonify({"success": False, "error": "Failed to place bet"}), 500
+
+@betting_bp.route('/bet', methods=['POST'])
+@require_user
+def place_bet():
+    """Place (or change) the logged-in player's bet. Keeps the banker flag."""
+    return _place(is_banker=None)
 
 @betting_bp.route('/banker', methods=['POST'])
+@require_user
 def place_banker_bet():
-    """Place a banker bet for a user on a specific horse."""
-    data = request.json
-    user_id = data.get('userId')
-    race_id = data.get('raceId')
-    horse_number = data.get('horseNumber')
-
-    if not all([user_id, race_id, horse_number]):
-        return jsonify({"error": "Missing required fields: userId, raceId, horseNumber"}), 400
-
-    success = data_service.place_bet(user_id, race_id, horse_number, is_banker=True)
-    if success:
-        return jsonify({"success": True, "message": f"Banker bet placed for user {user_id} on horse {horse_number} in race {race_id}"}), 200
-    else:
-        # Check if race is completed to provide specific error message
-        from models import Race
-        race = Race.query.get(race_id)
-        if race and race.status == 'completed':
-            return jsonify({"success": False, "error": "Cannot place banker bet on completed race"}), 400
-        else:
-            return jsonify({"success": False, "error": "Failed to place banker bet"}), 500
+    """Make the logged-in player's bet on this race their banker for the day."""
+    return _place(is_banker=True)
 
 @betting_bp.route('/bets', methods=['GET'])
 def get_all_bets():
-    """Get all bets from the database."""
-    from models import Bet, User, Race
-    bets = Bet.query.all()
-    bets_data = []
-    for bet in bets:
-        bets_data.append({
-            "userId": bet.user_id,
-            "raceId": bet.race_id,
-            "horse": bet.horse_number,
-            "is_banker": bet.is_banker
-        })
-    return jsonify(bets_data)
+    """All bets visible to the caller: their own, plus everyone's once a race locks."""
+    return jsonify(data_service.get_visible_bets(current_user_id()))
 
 @betting_bp.route('/bankers', methods=['GET'])
 def get_all_bankers():
-    """Get all banker bets from the database, optionally filtered by race date."""
-    from models import Bet, Race
-    
+    """Banker bets {userId: raceId}; others' are hidden until the day's first race starts."""
     race_date = request.args.get('race_date')
-    
-    if race_date:
-        # Filter bankers by specific race date
-        bankers = Bet.query.join(Race).filter(
-            Bet.is_banker == True,
-            Race.date == race_date
-        ).all()
-    else:
-        # Return all bankers (backward compatibility)
-        bankers = Bet.query.filter_by(is_banker=True).all()
-    
-    bankers_data = {}
-    for banker in bankers:
-        bankers_data[banker.user_id] = banker.race_id
-    return jsonify(bankers_data)
+    return jsonify(data_service.get_visible_bankers(race_date, current_user_id()))

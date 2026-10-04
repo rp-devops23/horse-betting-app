@@ -90,6 +90,8 @@ def apply_migrations(app):
         "ALTER TABLE horses ADD COLUMN IF NOT EXISTS form VARCHAR",
         "ALTER TABLE user_scores ADD COLUMN IF NOT EXISTS wins INTEGER DEFAULT 0",
         "ALTER TABLE bet_logs ADD COLUMN IF NOT EXISTS changed_by VARCHAR",
+        # PINs are now stored hashed
+        "ALTER TABLE users ALTER COLUMN pin TYPE VARCHAR(255)",
         # World Cup penalty columns (temporary)
         "ALTER TABLE wc_matches ADD COLUMN IF NOT EXISTS penalty_winner VARCHAR",
         "ALTER TABLE wc_bets ADD COLUMN IF NOT EXISTS predicted_pen_winner VARCHAR",
@@ -104,6 +106,13 @@ def apply_migrations(app):
                     print(f"[Migration] {sql[:50]}... -> {e}")
 
 apply_migrations(app)
+
+# Hash any legacy plaintext PINs (no-op once done)
+with app.app_context():
+    from services import data_service
+    _upgraded = data_service.hash_plaintext_pins()
+    if _upgraded:
+        print(f"[Migration] Hashed {_upgraded} plaintext PIN(s)")
 
 if __name__ == '__main__':
 

@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Settings, Users, Plus, Calendar, Edit2, Trash2, Check, X, LogOut, Download, Upload, Eye, EyeOff, Sliders, ShieldCheck, ClipboardList, Database } from 'lucide-react';
-import API_BASE from '../config';
+import { Settings, Users, Plus, Calendar, Edit2, Trash2, Check, X, LogOut, Download, Upload, Sliders, ShieldCheck, ClipboardList, Database } from 'lucide-react';
+import { apiFetch } from '../api';
 import { BADGE_COLOURS, initials } from '../utils/userColors';
 
 /* ── Action labels ── */
@@ -42,7 +42,6 @@ const AdminTab = ({
   const [editingUserName, setEditingUserName] = useState('');
   const [editingUserPin, setEditingUserPin] = useState('');
   const [usersWithPins, setUsersWithPins] = useState([]);
-  const [showPins, setShowPins] = useState({});
   const [restoring, setRestoring] = useState(false);
   const [loadingAction, setLoadingAction] = useState(null);
   const [refreshDate, setRefreshDate] = useState(() => new Date().toISOString().slice(0, 10));
@@ -66,7 +65,7 @@ const AdminTab = ({
   useEffect(() => {
     const fetchUsersWithPins = async () => {
       try {
-        const res = await fetch(`${API_BASE}/admin/users`);
+        const res = await apiFetch(`/admin/users`);
         if (res.ok) setUsersWithPins(await res.json());
       } catch { /* silently ignore */ }
     };
@@ -77,7 +76,7 @@ const AdminTab = ({
   useEffect(() => {
     const fetchScoringConfig = async () => {
       try {
-        const res = await fetch(`${API_BASE}/admin/settings`);
+        const res = await apiFetch(`/admin/settings`);
         if (res.ok) setScoringConfig(await res.json());
       } catch { /* silently ignore */ }
     };
@@ -89,7 +88,7 @@ const AdminTab = ({
     setBetLogsLoading(true);
     try {
       const params = betLogsDate ? `?race_date=${betLogsDate}` : '';
-      const res = await fetch(`${API_BASE}/admin/bet-logs${params}`);
+      const res = await apiFetch(`/admin/bet-logs${params}`);
       if (res.ok) setBetLogs(await res.json());
     } catch { /* silently ignore */ }
     finally { setBetLogsLoading(false); }
@@ -100,7 +99,7 @@ const AdminTab = ({
     setJobLogsLoading(true);
     try {
       const params = jobTypeFilter ? `?job_type=${jobTypeFilter}` : '';
-      const res = await fetch(`${API_BASE}/admin/job-logs${params}`);
+      const res = await apiFetch(`/admin/job-logs${params}`);
       if (res.ok) setJobLogs(await res.json());
     } catch { /* silently ignore */ }
     finally { setJobLogsLoading(false); }
@@ -118,7 +117,7 @@ const AdminTab = ({
     if (!scoringConfig) return;
     setSavingScoring(true);
     try {
-      const res = await fetch(`${API_BASE}/admin/settings`, {
+      const res = await apiFetch(`/admin/settings`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(scoringConfig),
@@ -154,8 +153,8 @@ const AdminTab = ({
     }));
   };
 
-  const getPinForUser = (userId) =>
-    usersWithPins.find(u => String(u.id) === String(userId))?.pin ?? '····';
+  const hasPin = (userId) =>
+    !!usersWithPins.find(u => String(u.id) === String(userId))?.has_pin;
 
   const handleStartEdit = (user) => {
     setEditingUserId(user.id);
@@ -180,12 +179,9 @@ const AdminTab = ({
     setEditingUserPin('');
   };
 
-  const toggleShowPin = (userId) =>
-    setShowPins(prev => ({ ...prev, [userId]: !prev[userId] }));
-
   const handleToggleAdmin = async (userId, currentIsAdmin) => {
     try {
-      const res = await fetch(`${API_BASE}/admin/users/toggle-admin`, {
+      const res = await apiFetch(`/admin/users/toggle-admin`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId, isAdmin: !currentIsAdmin }),
@@ -199,7 +195,21 @@ const AdminTab = ({
     }
   };
 
-  const handleDownloadBackup = () => window.open(`${API_BASE}/admin/backup`, '_blank');
+  const handleDownloadBackup = async () => {
+    try {
+      const res = await apiFetch(`/admin/backup`);
+      if (!res.ok) { showMessage('Sauvegarde impossible.', 'error'); return; }
+      const match = /filename="([^"]+)"/.exec(res.headers.get('Content-Disposition') || '');
+      const url = URL.createObjectURL(await res.blob());
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = match ? match[1] : 'lekours_backup.json';
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      showMessage(`Erreur : ${e.message}`, 'error');
+    }
+  };
 
   const handleRestoreBackup = async (e) => {
     const file = e.target.files[0];
@@ -211,7 +221,7 @@ const AdminTab = ({
     setRestoring(true);
     try {
       const backup = JSON.parse(await file.text());
-      const res = await fetch(`${API_BASE}/admin/restore`, {
+      const res = await apiFetch(`/admin/restore`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(backup),
@@ -230,7 +240,7 @@ const AdminTab = ({
   const handleScrapeRaces = async () => {
     setLoadingAction('scrape');
     try {
-      const res = await fetch(`${API_BASE}/races/scrape`, { method: 'POST' });
+      const res = await apiFetch(`/races/scrape`, { method: 'POST' });
       const data = await res.json();
       if (data.success) { showMessage(data.message || 'Courses importées !', 'success'); fetchAllData(); }
       else showMessage(data.error, 'error');
@@ -241,7 +251,7 @@ const AdminTab = ({
   const handleUpdateOdds = async () => {
     setLoadingAction('odds');
     try {
-      const res = await fetch(`${API_BASE}/races/update-odds`, {
+      const res = await apiFetch(`/races/update-odds`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       });
@@ -255,7 +265,7 @@ const AdminTab = ({
   const handleScrapeResults = async () => {
     setLoadingAction('results');
     try {
-      const res = await fetch(`${API_BASE}/races/results`, {
+      const res = await apiFetch(`/races/results`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       });
@@ -269,7 +279,7 @@ const AdminTab = ({
   const handleRefreshScores = async () => {
     setLoadingAction('refresh');
     try {
-      const res = await fetch(`${API_BASE}/races/refresh-scores`, {
+      const res = await apiFetch(`/races/refresh-scores`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ race_date: refreshDate }),
@@ -323,8 +333,6 @@ const AdminTab = ({
         <div className="space-y-2">
           {users.map((user, index) => {
             const colour = BADGE_COLOURS[index % BADGE_COLOURS.length];
-            const pin = getPinForUser(user.id);
-            const pinVisible = showPins[user.id];
 
             return (
               <div key={user.id} className="bg-white rounded-md border p-2">
@@ -364,12 +372,9 @@ const AdminTab = ({
                     </span>
                     <span className="flex-1 min-w-0 text-sm font-medium truncate">{user.name}</span>
                     {user.is_admin && <ShieldCheck className="w-4 h-4 text-indigo-500 flex-shrink-0" title="Admin" />}
-                    <span className="text-sm font-mono text-gray-500 w-10 text-center flex-shrink-0">
-                      {pinVisible ? pin : '••••'}
+                    <span className={`text-xs flex-shrink-0 ${hasPin(user.id) ? 'text-gray-400' : 'text-red-500 font-semibold'}`} title="Les PIN sont chiffrés — modifie l'utilisateur pour en définir un nouveau">
+                      {hasPin(user.id) ? 'PIN ••••' : 'Pas de PIN'}
                     </span>
-                    <button onClick={() => toggleShowPin(user.id)} className="p-1 text-gray-400 hover:text-gray-700 rounded flex-shrink-0" title={pinVisible ? 'Masquer PIN' : 'Voir PIN'}>
-                      {pinVisible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
                     <button onClick={() => handleToggleAdmin(user.id, user.is_admin)} className={`p-1 rounded flex-shrink-0 ${user.is_admin ? 'text-indigo-500 hover:bg-indigo-50' : 'text-gray-300 hover:text-indigo-400'}`} title={user.is_admin ? 'Retirer accès admin' : 'Donner accès admin'}>
                       <ShieldCheck className="w-4 h-4" />
                     </button>

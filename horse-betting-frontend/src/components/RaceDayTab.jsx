@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, ChevronDown, Trophy, Edit3, X, Star, Check, AlertCircle, Flag, Lock, Pencil } from 'lucide-react';
-import API_BASE from '../config';
+import { apiFetch } from '../api';
 import { initials, getUserColour } from '../utils/userColors';
 
 // Returns true if it's past the race start time in Mauritius (GMT+4)
@@ -40,7 +40,7 @@ const RaceDayTab = ({
 
   const handleSetWinner = async (raceId, winnerHorseNumber) => {
     try {
-      const res = await fetch(`${API_BASE}/races/${raceId}/winner`, {
+      const res = await apiFetch(`/races/${raceId}/winner`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ winnerHorseNumber }),
@@ -60,7 +60,7 @@ const RaceDayTab = ({
     const parsed = parseFloat(value);
     if (!parsed || parsed <= 0) { setEditingOdds(null); return; }
     try {
-      await fetch(`${API_BASE}/races/${raceId}/horses/${horseNumber}/odds`, {
+      await apiFetch(`/races/${raceId}/horses/${horseNumber}/odds`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ odds: parsed }),
@@ -74,7 +74,7 @@ const RaceDayTab = ({
 
   const handleSetLastHorse = async (raceId, horseNumber) => {
     try {
-      const res = await fetch(`${API_BASE}/races/${raceId}/last`, {
+      const res = await apiFetch(`/races/${raceId}/last`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ lastHorseNumber: horseNumber }),
@@ -90,7 +90,7 @@ const RaceDayTab = ({
 
   const handleToggleScratch = async (raceId, horseNumber) => {
     try {
-      const res = await fetch(`${API_BASE}/races/${raceId}/horses/${horseNumber}/scratch`, {
+      const res = await apiFetch(`/races/${raceId}/horses/${horseNumber}/scratch`, {
         method: 'POST',
       });
       if (res.ok) {
@@ -126,7 +126,7 @@ const RaceDayTab = ({
     if (payload.stall_number !== '') payload.stall_number = parseInt(payload.stall_number) || null;
     else payload.stall_number = null;
     try {
-      const res = await fetch(`${API_BASE}/races/${raceId}/horses/${horseNumber}`, {
+      const res = await apiFetch(`/races/${raceId}/horses/${horseNumber}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -148,7 +148,7 @@ const RaceDayTab = ({
     if (!raceDate) return;
     setLoadingScores(true);
     try {
-      const res = await fetch(`${API_BASE}/race-days/${raceDate}/scores`);
+      const res = await apiFetch(`/race-days/${raceDate}/scores`);
       if (res.ok) {
         const data = await res.json();
         setRaceDayScores(data.scores || []);
@@ -237,11 +237,12 @@ const RaceDayTab = ({
               const numB = parseInt((b.id.match(/R(\d+)/i) || [])[1] || 99);
               return numA - numB;
             })[0];
-            const bankerLocked = !isAdmin && (firstRace ? isRaceTimeLocked(firstRace.time, selectedRaceDay) : false);
+            const bankerLocked = !isAdmin && (firstRace ? (firstRace.locked || isRaceTimeLocked(firstRace.time, selectedRaceDay)) : false);
             return races.map(race => {
             const myBet = bets?.find(b => String(b.userId) === String(selectedUserId) && b.raceId === race.id);
             const isBanker = bankers && selectedUserId && bankers[String(selectedUserId)] === race.id;
-            const timeLocked = isRaceTimeLocked(race.time, selectedRaceDay);
+            const timeLocked = race.locked || isRaceTimeLocked(race.time, selectedRaceDay);
+            const hiddenBets = !timeLocked ? (race.betCount || 0) - (myBet ? 1 : 0) : 0;
             const canBet = !!selectedUserId && race.status !== 'completed' && (!timeLocked || isAdmin);
 
             return (
@@ -292,6 +293,11 @@ const RaceDayTab = ({
                           </div>
                         );
                       })()}
+                      {hiddenBets > 0 && (
+                        <p className="text-xs text-indigo-100 mt-0.5">
+                          🤫 {hiddenBets} pari{hiddenBets > 1 ? 's' : ''} secret{hiddenBets > 1 ? 's' : ''} — révélé{hiddenBets > 1 ? 's' : ''} au départ
+                        </p>
+                      )}
                       {timeLocked && race.status !== 'completed' && (
                         <p className="text-xs text-red-300 mt-0.5 flex items-center gap-1">
                           <Lock className="w-3 h-3" /> Paris verrouillés

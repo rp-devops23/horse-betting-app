@@ -23,6 +23,7 @@ jobs:
           echo "Triggering race scrape..."
           curl --fail --silent --show-error \
             --request POST \
+            --header "X-Job-Token: ${{ secrets.JOB_TOKEN }}" \
             --max-time 120 \
             "${{ secrets.BACKEND_URL }}/api/races/scrape" \
             | tee /tmp/response.json
@@ -34,6 +35,7 @@ jobs:
           echo "Triggering odds update..."
           curl --fail --silent --show-error \
             --request POST \
+            --header "X-Job-Token: ${{ secrets.JOB_TOKEN }}" \
             --header "Content-Type: application/json" \
             --max-time 60 \
             "${{ secrets.BACKEND_URL }}/api/races/update-odds" \

@@ -1,6 +1,7 @@
 # routes/race_days.py (Updated - Using DataService)
 from flask import Blueprint, jsonify, request
 from services import data_service
+from auth import current_user_id
 
 race_days_bp = Blueprint('race_days', __name__)
 
@@ -13,7 +14,7 @@ def get_race_days():
 @race_days_bp.route('/<race_date>', methods=['GET'])
 def get_race_day_data_by_date(race_date):
     """Get the full data for a specific race day."""
-    day_data = data_service.get_race_day_data(race_date)
+    day_data = data_service.get_race_day_data(race_date, current_user_id())
     if day_data:
         return jsonify(day_data)
     return jsonify({"error": "Race day not found"}), 404
@@ -23,7 +24,7 @@ def get_current_race_day():
     """Get the current/latest race day data."""
     from datetime import datetime
     current_date = datetime.now().strftime('%Y-%m-%d')
-    day_data = data_service.get_race_day_data(current_date)
+    day_data = data_service.get_race_day_data(current_date, current_user_id())
     if day_data:
         return jsonify({"data": day_data})
     
@@ -31,7 +32,7 @@ def get_current_race_day():
     index_data = data_service.get_race_day_index()
     if index_data.get("raceDays"):
         latest_date = index_data["raceDays"][0]["date"]  # First is most recent
-        latest_data = data_service.get_race_day_data(latest_date)
+        latest_data = data_service.get_race_day_data(latest_date, current_user_id())
         return jsonify({"data": latest_data})
     
     return jsonify({"data": None})

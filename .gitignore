@@ -49,3 +49,6 @@ secrets/
 credentials/
 keys/
 *.secret
+# Local SQLite database
+instance/
+*.db

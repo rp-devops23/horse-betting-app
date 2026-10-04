@@ -10,7 +10,7 @@ class User(db.Model):
     __tablename__ = 'users'
     id = db.Column(db.String, primary_key=True)
     name = db.Column(db.String, nullable=False)
-    pin = db.Column(db.String(4), nullable=True)
+    pin = db.Column(db.String(255), nullable=True)  # werkzeug hash
     is_admin = db.Column(db.Boolean, default=False)
 
     # Relationships

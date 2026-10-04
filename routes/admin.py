@@ -2,28 +2,37 @@
 import os
 from flask import Blueprint, jsonify, request
 from services import data_service
+from auth import require_admin, issue_token, current_user_id, is_locked_out, record_failed_attempt, clear_failed_attempts
 
 admin_bp = Blueprint('admin', __name__)
 
 @admin_bp.route('/login', methods=['POST'])
 def admin_login():
     """Validates admin password against ADMIN_PASSWORD env var."""
-    password = request.json.get('password', '')
+    import hmac
+    password = (request.get_json(silent=True) or {}).get('password', '')
     expected = os.getenv('ADMIN_PASSWORD')
     if not expected:
         raise RuntimeError("ADMIN_PASSWORD environment variable is not set")
-    if password == expected:
-        return jsonify({"success": True}), 200
+    if is_locked_out('admin'):
+        return jsonify({"success": False, "error": "Trop d'essais. Réessaie dans quelques minutes."}), 429
+    if hmac.compare_digest(password.encode(), expected.encode()):
+        clear_failed_attempts('admin')
+        # Keep the logged-in player (if any) attached to the admin session
+        return jsonify({"success": True, "token": issue_token(current_user_id(), admin_password=True)}), 200
+    record_failed_attempt('admin')
     return jsonify({"success": False, "error": "Invalid password"}), 401
 
 @admin_bp.route('/users', methods=['GET'])
+@require_admin
 def get_users_with_pins():
-    """Returns all users with their PINs (admin only)."""
+    """Returns all users and whether they have a PIN set (PINs are hashed)."""
     from models import User
     users = User.query.order_by(User.name).all()
-    return jsonify([{'id': u.id, 'name': u.name, 'pin': u.pin} for u in users])
+    return jsonify([{'id': u.id, 'name': u.name, 'has_pin': bool(u.pin)} for u in users])
 
 @admin_bp.route('/users', methods=['PUT'])
+@require_admin
 def update_user():
     """Updates a user's name and/or PIN."""
     data = request.json
@@ -33,6 +42,8 @@ def update_user():
 
     if not user_id or (not name and not pin):
         return jsonify({"error": "User ID and at least one of name or PIN are required"}), 400
+    if pin and (len(str(pin)) != 4 or not str(pin).isdigit()):
+        return jsonify({"error": "PIN must be 4 digits"}), 400
 
     success = data_service.update_user(user_id, name, pin)
     if success:
@@ -41,6 +52,7 @@ def update_user():
         return jsonify({"success": False, "error": "User not found or update failed."}), 404
 
 @admin_bp.route('/users', methods=['DELETE'])
+@require_admin
 def delete_user():
     """Deletes a user and all their associated data."""
     user_id = request.json.get('userId')
@@ -54,6 +66,7 @@ def delete_user():
         return jsonify({"success": False, "error": "User not found or deletion failed."}), 404
 
 @admin_bp.route('/race-days/<race_date>', methods=['DELETE'])
+@require_admin
 def delete_race_day(race_date):
     """Deletes a race day and all associated data."""
     success = data_service.delete_race_day(race_date)
@@ -63,6 +76,7 @@ def delete_race_day(race_date):
         return jsonify({"success": False, "error": "Race day not found or deletion failed."}), 404
 
 @admin_bp.route('/backup', methods=['GET'])
+@require_admin
 def backup_data():
     """Download a full JSON backup of the database."""
     backup = data_service.backup_all_data()
@@ -76,6 +90,7 @@ def backup_data():
     )
 
 @admin_bp.route('/restore', methods=['POST'])
+@require_admin
 def restore_data():
     """Restore the database from a JSON backup. Wipes all existing data first."""
     backup = request.get_json(force=True)
@@ -87,6 +102,7 @@ def restore_data():
     return jsonify({"success": False, "error": "Restore failed — check server logs."}), 500
 
 @admin_bp.route('/files', methods=['GET'])
+@require_admin
 def get_file_tree():
     """
     Simulates a file tree. Since we are using a database, this is now a placeholder.
@@ -94,6 +110,7 @@ def get_file_tree():
     return jsonify({"error": "File tree not available when using a database."}), 400
 
 @admin_bp.route('/users/toggle-admin', methods=['POST'])
+@require_admin
 def toggle_user_admin():
     """Grants or revokes admin flag for a user."""
     data = request.get_json(force=True)
@@ -111,6 +128,7 @@ def get_settings():
     return jsonify(data_service.get_scoring_config())
 
 @admin_bp.route('/settings', methods=['PUT'])
+@require_admin
 def update_settings():
     """Saves a new scoring configuration."""
     config = request.get_json(force=True)
@@ -121,6 +139,7 @@ def update_settings():
     return jsonify({"error": "Failed to save settings"}), 500
 
 @admin_bp.route('/races/<race_id>/horses', methods=['GET'])
+@require_admin
 def list_race_horses(race_id):
     """Lists all horses and bets for a specific race (for debugging duplicate-horse issues)."""
     from models import Race, Horse, Bet, User
@@ -141,6 +160,7 @@ def list_race_horses(race_id):
 
 
 @admin_bp.route('/races/<race_id>/horses/<int:horse_number>', methods=['DELETE'])
+@require_admin
 def delete_horse(race_id, horse_number):
     """Deletes a specific horse record (use to remove duplicates created by re-scraping)."""
     from models import Horse, Bet
@@ -157,6 +177,7 @@ def delete_horse(race_id, horse_number):
 
 
 @admin_bp.route('/bet', methods=['POST'])
+@require_admin
 def admin_place_bet():
     """Admin: place or change any bet for any user, bypassing all restrictions."""
     data = request.get_json(force=True) or {}
@@ -164,32 +185,34 @@ def admin_place_bet():
     race_id = data.get('raceId')
     horse_number = data.get('horseNumber')
     is_banker = bool(data.get('isBanker', False))
-    admin_id = data.get('adminId')
-    if not all([user_id, race_id, horse_number, admin_id]):
-        return jsonify({"error": "userId, raceId, horseNumber and adminId are required"}), 400
-    success = data_service.place_bet(user_id, race_id, int(horse_number), is_banker=is_banker, force=True, changed_by=admin_id)
+    admin_id = current_user_id() or 'admin'
+    if not all([user_id, race_id, horse_number]):
+        return jsonify({"error": "userId, raceId and horseNumber are required"}), 400
+    success = data_service.place_bet(user_id, race_id, int(horse_number), is_banker=is_banker, force=True, changed_by=None if admin_id == user_id else admin_id)
     if success:
         return jsonify({"success": True}), 200
     return jsonify({"success": False, "error": "Failed to place bet"}), 500
 
 
 @admin_bp.route('/banker', methods=['POST'])
+@require_admin
 def admin_set_banker():
     """Force-set a banker for any user on any race, bypassing the completed-race restriction."""
     data = request.get_json(force=True) or {}
     user_id = data.get('userId')
     race_id = data.get('raceId')
     horse_number = data.get('horseNumber')
-    admin_id = data.get('adminId')
+    admin_id = current_user_id() or 'admin'
     if not all([user_id, race_id, horse_number]):
         return jsonify({"error": "userId, raceId and horseNumber are required"}), 400
-    success = data_service.place_bet(user_id, race_id, int(horse_number), is_banker=True, force=True, changed_by=admin_id)
+    success = data_service.place_bet(user_id, race_id, int(horse_number), is_banker=True, force=True, changed_by=None if admin_id == user_id else admin_id)
     if success:
         return jsonify({"success": True}), 200
     return jsonify({"success": False, "error": "Failed to set banker"}), 500
 
 
 @admin_bp.route('/bet-logs', methods=['GET'])
+@require_admin
 def get_bet_logs():
     """Returns bet change logs, optionally filtered by race_date or user_id."""
     from models import BetLog, User, Race, Horse
@@ -242,6 +265,7 @@ def get_bet_logs():
 
 
 @admin_bp.route('/job-logs', methods=['GET'])
+@require_admin
 def get_job_logs():
     """Returns job execution logs, optionally filtered by job_type or race_date."""
     from models import JobLog
@@ -273,6 +297,7 @@ def get_job_logs():
 
 
 @admin_bp.route('/reset-data', methods=['POST'])
+@require_admin
 def reset_all_data():
     """Delete all user data (bets, bankers, users)."""
     try:

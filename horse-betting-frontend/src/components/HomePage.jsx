@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Trophy, Shield, Users, Info, Award, Target, Heart } from 'lucide-react';
-import API_BASE from '../config';
+import { apiFetch } from '../api';
 
 const TIER_COLOURS = [
   'bg-purple-100 text-purple-800',
@@ -14,7 +14,7 @@ const HomePage = () => {
   const [scoringConfig, setScoringConfig] = useState(null);
 
   useEffect(() => {
-    fetch(`${API_BASE}/admin/settings`)
+    apiFetch(`/admin/settings`)
       .then(r => r.ok ? r.json() : null)
       .then(data => { if (data) setScoringConfig(data); })
       .catch(() => {});

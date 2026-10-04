@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Trophy, Users } from 'lucide-react';
 
-import API_BASE from '../config';
+import { apiFetch } from '../api';
 
 const LeaderboardTab = ({ users, showMessage }) => {
   const [leaderboardData, setLeaderboardData] = useState([]);
@@ -18,7 +18,7 @@ const LeaderboardTab = ({ users, showMessage }) => {
     const fetchLeaderboardData = async () => {
       setLoading(true);
       try {
-        const response = await fetch(`${API_BASE}/race-days/leaderboard`);
+        const response = await apiFetch(`/race-days/leaderboard`);
         const data = await response.json();
         if (data && data.success) {
           const list = Array.isArray(data.leaderboard) ? data.leaderboard : [];

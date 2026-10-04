@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BarChart3 } from 'lucide-react';
 
-import API_BASE from '../config';
+import { apiFetch } from '../api';
 
 const COLUMNS = [
   { key: 'crowns',       label: 'Jours gagnants',   format: v => v != null ? `${v}` : '-' },
@@ -22,7 +22,7 @@ const StatsTab = ({ showMessage }) => {
     const fetchStats = async () => {
       setLoading(true);
       try {
-        const res = await fetch(`${API_BASE}/race-days/stats`);
+        const res = await apiFetch(`/race-days/stats`);
         const data = await res.json();
         if (data && data.success) {
           setStats(data.stats || []);

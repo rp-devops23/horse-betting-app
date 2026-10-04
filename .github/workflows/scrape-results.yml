@@ -49,6 +49,7 @@ jobs:
 
           curl --fail --silent --show-error \
             --request POST \
+            --header "X-Job-Token: ${{ secrets.JOB_TOKEN }}" \
             --header "Content-Type: application/json" \
             --max-time 120 \
             ${DATE_PARAM} \

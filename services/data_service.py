@@ -7,10 +7,13 @@ This version imports models and database directly, not from server.py.
 import json
 import logging
 import uuid
+import hmac
 import os
 import re
-from typing import Dict, List, Any, Tuple
-from datetime import datetime
+from typing import Dict, List, Any, Tuple, Optional
+from datetime import datetime, timedelta, timezone
+
+from werkzeug.security import generate_password_hash, check_password_hash
 
 # Import database and models directly (no circular import)
 from database import db
@@ -25,6 +28,13 @@ DEFAULT_SCORING_CONFIG = {
     ],
     "last_place_penalty": 0
 }
+
+# Races run in Mauritius; race times are local (UTC+4)
+MAURITIUS_TZ = timezone(timedelta(hours=4))
+PIN_HASH_METHOD = 'pbkdf2:sha256'
+
+def _is_plain_pin(pin: str) -> bool:
+    return bool(pin) and re.fullmatch(r'\d{4}', pin) is not None
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -53,7 +63,7 @@ class DataService:
     def add_user(self, name: str, pin: str = None) -> Dict[str, Any]:
         """Add a new user to the database."""
         user_id = str(uuid.uuid4())
-        new_user = User(id=user_id, name=name, pin=pin)
+        new_user = User(id=user_id, name=name, pin=generate_password_hash(pin, method=PIN_HASH_METHOD) if pin else None)
         db.session.add(new_user)
         db.session.commit()
         return {"id": user_id, "name": name}
@@ -61,9 +71,28 @@ class DataService:
     def verify_user_pin(self, user_id: str, pin: str):
         """Verify a user's PIN. Returns dict with is_admin on success, False on failure."""
         user = User.query.get(user_id)
-        if user and user.pin and user.pin == pin:
-            return {"success": True, "is_admin": bool(user.is_admin)}
-        return False
+        if not user or not user.pin:
+            return False
+        if _is_plain_pin(user.pin):
+            # Legacy plaintext PIN: verify, then upgrade to a hash
+            if not hmac.compare_digest(user.pin, pin):
+                return False
+            user.pin = generate_password_hash(pin, method=PIN_HASH_METHOD)
+            db.session.commit()
+        elif not check_password_hash(user.pin, pin):
+            return False
+        return {"success": True, "is_admin": bool(user.is_admin), "name": user.name}
+
+    def hash_plaintext_pins(self) -> int:
+        """Replace any legacy plaintext PINs with hashes. Returns the number upgraded."""
+        count = 0
+        for user in User.query.all():
+            if _is_plain_pin(user.pin):
+                user.pin = generate_password_hash(user.pin, method=PIN_HASH_METHOD)
+                count += 1
+        if count:
+            db.session.commit()
+        return count
 
     def set_user_admin(self, user_id: str, is_admin: bool) -> bool:
         """Set or unset admin flag for a user."""
@@ -106,7 +135,7 @@ class DataService:
                 if name:
                     user.name = name
                 if pin:
-                    user.pin = pin
+                    user.pin = generate_password_hash(pin, method=PIN_HASH_METHOD)
                 db.session.commit()
                 return True
             return False
@@ -115,20 +144,94 @@ class DataService:
             db.session.rollback()
             return False
 
+    # --- Bet Locking & Visibility ---
+
+    def race_start_time(self, race: Race) -> Optional[datetime]:
+        """Start time of a race as an aware datetime, or None if unknown."""
+        match = re.match(r'^\s*(\d{1,2})[:hH.](\d{2})', race.time or '')
+        if not match or not race.date:
+            return None
+        try:
+            day = datetime.strptime(race.date, '%Y-%m-%d')
+        except ValueError:
+            return None
+        return day.replace(hour=int(match.group(1)), minute=int(match.group(2)), tzinfo=MAURITIUS_TZ)
+
+    def is_race_locked(self, race: Race, now: datetime = None) -> bool:
+        """Bets on a race lock when it starts or once it has a result."""
+        if race.status == 'completed' or race.winner_horse_number is not None:
+            return True
+        start = self.race_start_time(race)
+        return start is not None and (now or datetime.now(timezone.utc)) >= start
+
+    def first_race_of_day(self, race_date: str) -> Optional[Race]:
+        return Race.query.filter_by(date=race_date).order_by(Race.race_number).first()
+
+    def is_banker_locked(self, race_date: str, now: datetime = None) -> bool:
+        """Bankers lock for the whole day once the first race starts."""
+        first = self.first_race_of_day(race_date)
+        return first is not None and self.is_race_locked(first, now)
+
+    def get_visible_bets(self, viewer_id: str = None) -> List[Dict[str, Any]]:
+        """All bets, except other players' bets on races that haven't locked yet."""
+        now = datetime.now(timezone.utc)
+        races = {r.id: r for r in Race.query.all()}
+        locked = {rid: self.is_race_locked(r, now) for rid, r in races.items()}
+        banker_locked_dates = {}
+        result = []
+        for bet in Bet.query.all():
+            race = races.get(bet.race_id)
+            if not race:
+                continue
+            is_mine = viewer_id is not None and bet.user_id == viewer_id
+            if not is_mine and not locked[bet.race_id]:
+                continue
+            if race.date not in banker_locked_dates:
+                banker_locked_dates[race.date] = self.is_banker_locked(race.date, now)
+            show_banker = is_mine or banker_locked_dates[race.date]
+            result.append({
+                "userId": bet.user_id,
+                "raceId": bet.race_id,
+                "horse": bet.horse_number,
+                "is_banker": bool(bet.is_banker) and show_banker,
+            })
+        return result
+
+    def get_visible_bankers(self, race_date: str = None, viewer_id: str = None) -> Dict[str, str]:
+        """{user_id: race_id} of bankers; others' are hidden until the day's first race starts."""
+        query = Bet.query.join(Race).filter(Bet.is_banker == True)  # noqa: E712
+        if race_date:
+            query = query.filter(Race.date == race_date)
+        now = datetime.now(timezone.utc)
+        locked_dates = {}
+        result = {}
+        for bet in query.all():
+            date = bet.race.date
+            if date not in locked_dates:
+                locked_dates[date] = self.is_banker_locked(date, now)
+            if bet.user_id == viewer_id or locked_dates[date]:
+                result[bet.user_id] = bet.race_id
+        return result
+
     # --- Race Day Management ---
-    
+
     def get_race_day_index(self) -> Dict[str, Any]:
         """Get the list of all race days from the database."""
         race_dates = db.session.query(Race.date).group_by(Race.date).order_by(Race.date.desc()).all()
         return {"raceDays": [{"date": d[0]} for d in race_dates]}
         
-    def get_race_day_data(self, race_date: str) -> Dict[str, Any]:
-        """Get all data for a specific race day from the database."""
+    def get_race_day_data(self, race_date: str, viewer_id: str = None) -> Dict[str, Any]:
+        """Get all data for a specific race day from the database.
+
+        Other players' bets are hidden until a race locks; only a count is given.
+        """
         races = Race.query.filter_by(date=race_date).order_by(Race.race_number).all()
-        
+
         if not races:
             return {}
-            
+
+        now = datetime.now(timezone.utc)
+        banker_locked = self.is_race_locked(races[0], now)
         races_data = []
         for race in races:
             horses_data = []
@@ -146,11 +249,18 @@ class DataService:
                     "form": horse.form,
                 })
 
-            bets_data = {bet.user_id: bet.horse_number for bet in Bet.query.filter_by(race_id=race.id).all()}
+            locked = self.is_race_locked(race, now)
+            race_bets = Bet.query.filter_by(race_id=race.id).all()
+            bets_data = {
+                bet.user_id: bet.horse_number for bet in race_bets
+                if locked or bet.user_id == viewer_id
+            }
             bankers_data = [
                 {"userId": bet.user_id, "horseNumber": bet.horse_number}
-                for bet in Bet.query.filter_by(race_id=race.id, is_banker=True).all()
+                for bet in race_bets
+                if bet.is_banker and (banker_locked or bet.user_id == viewer_id)
             ]
+            start = self.race_start_time(race)
 
             races_data.append({
                 "id": race.id,
@@ -163,7 +273,10 @@ class DataService:
                 "lastHorse": race.last_horse_number,
                 "horses": horses_data,
                 "bets": bets_data,
-                "bankers": bankers_data
+                "bankers": bankers_data,
+                "betCount": len(race_bets),
+                "locked": locked,
+                "startsAt": start.isoformat() if start else None,
             })
 
         user_scores = UserScore.query.filter_by(race_date=race_date).all()
@@ -180,7 +293,8 @@ class DataService:
         return {
             "date": race_date,
             "races": races_data,
-            "userScores": user_scores_data
+            "userScores": user_scores_data,
+            "bankerLocked": banker_locked,
         }
 
     def save_current_race_day_data(self, day_data: Dict[str, Any]) -> bool:
@@ -342,10 +456,19 @@ class DataService:
             
     # --- Betting Management ---
 
-    def place_bet(self, user_id: str, race_id: str, horse_number: int, is_banker: bool, force: bool = False, changed_by: str = None) -> bool:
+    def bet_lock_error(self, race: Race, setting_banker: bool) -> Optional[str]:
+        """Returns why a player can't bet on this race right now, or None."""
+        if self.is_race_locked(race):
+            return "Paris verrouillés : la course a commencé"
+        if setting_banker and self.is_banker_locked(race.date):
+            return "Banker verrouillé : la première course a commencé"
+        return None
+
+    def place_bet(self, user_id: str, race_id: str, horse_number: int, is_banker: Optional[bool], force: bool = False, changed_by: str = None) -> bool:
         """Places a bet for a user on a specific horse in a race.
 
-        force=True bypasses the completed-race check (admin override only).
+        is_banker=None keeps the bet's current banker flag (False for a new bet).
+        force=True bypasses the race/banker lock checks (admin override only).
         changed_by: user_id of admin who made the change (None = user themselves).
         """
         try:
@@ -355,9 +478,13 @@ class DataService:
             if not user_exists or not race:
                 return False
 
-            # Check if race is completed - no betting allowed unless admin forces it
-            if race.status == 'completed' and not force:
+            # No betting once the race has started unless admin forces it
+            if not force and self.bet_lock_error(race, bool(is_banker)):
                 return False
+
+            if is_banker is None:
+                current = Bet.query.filter_by(user_id=user_id, race_id=race_id).first()
+                is_banker = bool(current and current.is_banker)
 
             # If setting as banker, remove any existing banker for this user on the same race date
             if is_banker:
@@ -518,6 +645,12 @@ class DataService:
             return {"success": False, "error": str(e)}
 
     # --- User Score Management ---
+
+    def recalculate_scores_for_race(self, race_id: str):
+        """Recalculate the day's scores for the date of the given race."""
+        race = Race.query.get(race_id)
+        if race:
+            self.calculate_historical_user_scores(race.date)
 
     def calculate_current_user_scores(self) -> List[Dict[str, Any]]:
         """Calculate and update user scores for the current race day."""
@@ -833,6 +966,7 @@ class DataService:
                 db.session.add(UserScore(id=s["id"], user_id=s["user_id"],
                                          race_date=s["race_date"], score=s["score"]))
             db.session.commit()
+            self.hash_plaintext_pins()
             return True
         except Exception as e:
             logger.error(f"Restore failed: {e}")
@@ -959,7 +1093,7 @@ class DataService:
                 logger.info("[OK] Race %d winner set to horse #%d", race_number, winner)
 
         if applied:
-            self.calculate_current_user_scores()
+            self.calculate_historical_user_scores(date_str)
             logger.info("[OK] Scores recalculated after applying %d result(s)", len(applied))
 
         return {"date": date_str, "results_applied": applied, "count": len(applied)}

@@ -1,5 +1,6 @@
 from flask import Blueprint, jsonify, request
 from services import data_service
+from auth import require_admin, require_admin_or_job
 from datetime import datetime
 
 races_bp = Blueprint('races', __name__)
@@ -18,6 +19,7 @@ def get_races():
     return jsonify(races)
 
 @races_bp.route('/races/scrape', methods=['POST'])
+@require_admin_or_job
 def scrape_races():
     """Scrapes races for a new race day and sets it as current."""
     log_id = None
@@ -57,6 +59,7 @@ def scrape_races():
         return jsonify({"success": False, "error": str(e)}), 500
 
 @races_bp.route('/races/<race_id>/result', methods=['POST'])
+@require_admin
 def update_single_race_result(race_id):
     """Manually updates the result for a specific race."""
     try:
@@ -64,7 +67,7 @@ def update_single_race_result(race_id):
         if winner_number is None:
             return jsonify({"error": "Winner number is required"}), 400
         if data_service.save_race_result(race_id, winner_number):
-            data_service.calculate_current_user_scores()
+            data_service.recalculate_scores_for_race(race_id)
             print(f"[OK] Race result updated and synced to current race day")
             return jsonify({"success": True, "message": f"Race {race_id} winner set to horse #{winner_number}"}), 200
         else:
@@ -74,6 +77,7 @@ def update_single_race_result(race_id):
         return jsonify({"success": False, "error": str(e)}), 500
 
 @races_bp.route('/races/<race_id>/winner', methods=['POST'])
+@require_admin
 def set_race_winner(race_id):
     """Sets the winner for a specific race (alternative endpoint)."""
     try:
@@ -81,7 +85,7 @@ def set_race_winner(race_id):
         if winner_number is None:
             return jsonify({"error": "Winner horse number is required"}), 400
         if data_service.save_race_result(race_id, winner_number):
-            data_service.calculate_current_user_scores()
+            data_service.recalculate_scores_for_race(race_id)
             print(f"[OK] Race winner set: Race {race_id} won by horse #{winner_number}")
             return jsonify({"success": True, "message": f"Race {race_id} winner set to horse #{winner_number}"}), 200
         else:
@@ -91,6 +95,7 @@ def set_race_winner(race_id):
         return jsonify({"success": False, "error": str(e)}), 500
 
 @races_bp.route('/races/<race_id>/last', methods=['POST'])
+@require_admin
 def set_last_horse(race_id):
     """Sets the last-place horse for a race (admin only)."""
     try:
@@ -98,7 +103,7 @@ def set_last_horse(race_id):
         if horse_number is None:
             return jsonify({"error": "lastHorseNumber is required"}), 400
         if data_service.set_last_horse(race_id, horse_number):
-            data_service.calculate_current_user_scores()
+            data_service.recalculate_scores_for_race(race_id)
             return jsonify({"success": True}), 200
         return jsonify({"error": "Race not found"}), 404
     except Exception as e:
@@ -106,6 +111,7 @@ def set_last_horse(race_id):
         return jsonify({"success": False, "error": str(e)}), 500
 
 @races_bp.route('/races/<race_id>/horses/<int:horse_number>/scratch', methods=['POST'])
+@require_admin
 def toggle_scratch(race_id, horse_number):
     """Toggles a horse's scratched status; redirects bets to favorite if scratched."""
     try:
@@ -118,6 +124,7 @@ def toggle_scratch(race_id, horse_number):
         return jsonify({"success": False, "error": str(e)}), 500
 
 @races_bp.route('/races/refresh-scores', methods=['POST'])
+@require_admin
 def refresh_scores():
     """Refreshes user scores for a specific race day by recalculating them."""
     try:
@@ -129,10 +136,7 @@ def refresh_scores():
         UserScore.query.filter_by(race_date=race_date).delete()
         db.session.commit()
 
-        if race_date == datetime.now().strftime('%Y-%m-%d'):
-            scores = data_service.calculate_current_user_scores()
-        else:
-            scores = data_service.calculate_historical_user_scores(race_date)
+        scores = data_service.calculate_historical_user_scores(race_date)
 
         print(f"[OK] Scores refreshed for {race_date}: {len(scores)} users")
         return jsonify({"success": True, "message": f"Scores refreshed for {len(scores)} users on {race_date}", "scores": scores, "race_date": race_date}), 200
@@ -141,6 +145,7 @@ def refresh_scores():
         return jsonify({"success": False, "error": str(e)}), 500
 
 @races_bp.route('/races/<race_id>/horses/<int:horse_number>', methods=['PUT'])
+@require_admin
 def update_horse(race_id, horse_number):
     """Updates any editable fields on a horse (admin only)."""
     try:
@@ -155,6 +160,7 @@ def update_horse(race_id, horse_number):
         return jsonify({"success": False, "error": str(e)}), 500
 
 @races_bp.route('/races/<race_id>/horses/<int:horse_number>/odds', methods=['PUT'])
+@require_admin
 def update_horse_odds(race_id, horse_number):
     """Updates the odds for a specific horse (admin only)."""
     try:
@@ -174,6 +180,7 @@ def update_horse_odds(race_id, horse_number):
         return jsonify({"success": False, "error": str(e)}), 500
 
 @races_bp.route('/races/update-odds', methods=['POST'])
+@require_admin_or_job
 def update_odds():
     """Scrapes live Win odds from smspariaz.com and updates the current race day."""
     log_id = None
@@ -207,6 +214,7 @@ def update_odds():
         return jsonify({"success": False, "error": str(e)}), 500
 
 @races_bp.route('/races/results', methods=['POST'])
+@require_admin_or_job
 def scrape_results():
     """Scrapes results from supertote.mu and applies them to the DB."""
     log_id = None

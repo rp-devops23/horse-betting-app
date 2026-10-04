@@ -7,7 +7,7 @@ import LeaderboardTab from './components/LeaderboardTab.jsx';
 import AdminTab from './components/AdminTab.jsx';
 import StatsTab from './components/StatsTab.jsx';
 
-import API_BASE from './config';
+import { apiFetch, loadSession, saveSession } from './api';
 import { BADGE_COLOURS, initials, getUserColour } from './utils/userColors';
 
 const HorseBettingApp = () => {
@@ -23,7 +23,8 @@ const HorseBettingApp = () => {
   const [currentRaceDay, setCurrentRaceDay] = useState(null);
   const [availableRaceDays, setAvailableRaceDays] = useState([]);
   const [selectedRaceDay, setSelectedRaceDay] = useState(null);
-  const [selectedUserId, setSelectedUserId] = useState(null); // Start with no user selected
+  // Restore a saved session synchronously so the first fetches carry the token
+  const [selectedUserId, setSelectedUserId] = useState(() => loadSession()?.userId || null);
 
   // User PIN login state
   const [showPinModal, setShowPinModal] = useState(false);
@@ -60,30 +61,30 @@ const HorseBettingApp = () => {
     setLoading(true);
     const slowTimer = setTimeout(() => setSlowLoad(true), 3000);
     try {
-      const usersRes = await fetch(`${API_BASE}/users`);
+      const usersRes = await apiFetch(`/users`);
       const usersData = await usersRes.json();
       if (Array.isArray(usersData)) setUsers(usersData);
 
-      const betsRes = await fetch(`${API_BASE}/bets`);
+      const betsRes = await apiFetch(`/bets`);
       const betsData = await betsRes.json();
       if (Array.isArray(betsData)) setBets(betsData);
 
       // Fetch bankers for current race day if available
       const bankersUrl = selectedRaceDay 
-        ? `${API_BASE}/bankers?race_date=${selectedRaceDay}`
-        : `${API_BASE}/bankers`;
-      const bankersRes = await fetch(bankersUrl);
+        ? `/bankers?race_date=${selectedRaceDay}`
+        : `/bankers`;
+      const bankersRes = await apiFetch(bankersUrl);
       const bankersData = await bankersRes.json();
       if (typeof bankersData === 'object' && bankersData !== null) setBankers(bankersData);
 
       // Fetch available race days
-      const raceDaysRes = await fetch(`${API_BASE}/race-days/index`);
+      const raceDaysRes = await apiFetch(`/race-days/index`);
       const raceDaysData = await raceDaysRes.json();
       if (raceDaysData.raceDays && Array.isArray(raceDaysData.raceDays)) {
         setAvailableRaceDays(raceDaysData.raceDays.map(day => day.date));
       }
 
-      const currentDayRes = await fetch(`${API_BASE}/race-days/current`);
+      const currentDayRes = await apiFetch(`/race-days/current`);
       const currentDayData = await currentDayRes.json();
       setCurrentRaceDay(currentDayData.data);
       
@@ -111,7 +112,7 @@ const HorseBettingApp = () => {
   const fetchRaceDayData = useCallback(async (raceDate) => {
     setLoading(true);
     try {
-      const response = await fetch(`${API_BASE}/race-days/${raceDate}`);
+      const response = await apiFetch(`/race-days/${raceDate}`);
       const data = await response.json();
       
       if (data && data.races && Array.isArray(data.races)) {
@@ -119,7 +120,7 @@ const HorseBettingApp = () => {
         setSelectedRaceDay(raceDate);
         
         // Fetch bankers for this specific race date
-        const bankersRes = await fetch(`${API_BASE}/bankers?race_date=${raceDate}`);
+        const bankersRes = await apiFetch(`/bankers?race_date=${raceDate}`);
         const bankersData = await bankersRes.json();
         if (typeof bankersData === 'object' && bankersData !== null) setBankers(bankersData);
       } else {
@@ -140,7 +141,7 @@ const HorseBettingApp = () => {
       return;
     }
     try {
-      const response = await fetch(`${API_BASE}/users`, {
+      const response = await apiFetch(`/users`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: newUserName, pin: newUserPin })
@@ -168,7 +169,7 @@ const HorseBettingApp = () => {
       const body = { userId };
       if (newName?.trim()) body.name = newName.trim();
       if (newPin) body.pin = newPin;
-      const response = await fetch(`${API_BASE}/admin/users`, {
+      const response = await apiFetch(`/admin/users`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -194,7 +195,7 @@ const HorseBettingApp = () => {
       return;
     }
     try {
-      const response = await fetch(`${API_BASE}/admin/users`, {
+      const response = await apiFetch(`/admin/users`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId })
@@ -221,13 +222,14 @@ const HorseBettingApp = () => {
       return;
     }
     try {
-      const response = await fetch(`${API_BASE}/admin/login`, {
+      const response = await apiFetch(`/admin/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password: adminPassword })
       });
       const data = await response.json();
       if (data.success) {
+        saveSession({ token: data.token, userId: selectedUserId });
         setIsAdminAuthenticated(true);
         setShowAdminLogin(false);
         setAdminPassword('');
@@ -238,11 +240,14 @@ const HorseBettingApp = () => {
     } catch (error) {
       showMessage('Error contacting server.', 'error');
     }
-  }, [adminPassword, showMessage]);
+  }, [adminPassword, showMessage, selectedUserId]);
 
   const handleAdminLogout = useCallback(() => {
+    saveSession(null);
+    setSelectedUserId(null);
     setIsAdminAuthenticated(false);
     setAdminPassword('');
+    setActiveTab('home');
     showMessage('Admin access revoked.', 'info');
   }, [showMessage]);
 
@@ -261,7 +266,7 @@ const HorseBettingApp = () => {
   const clearAllUserData = useCallback(async () => {
     if (window.confirm("Are you sure you want to delete ALL user data (bets, bankers, users)? This cannot be undone!")) {
       try {
-        const res = await fetch(`${API_BASE}/admin/reset-data`, { method: 'POST' });
+        const res = await apiFetch(`/admin/reset-data`, { method: 'POST' });
         const data = await res.json();
         if (data.success) {
           showMessage("All user data has been cleared.", "success");
@@ -277,7 +282,7 @@ const HorseBettingApp = () => {
 
   const handleSetBet = useCallback(async (raceId, horseNumber) => {
     try {
-      const response = await fetch(`${API_BASE}/bet`, {
+      const response = await apiFetch(`/bet`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: String(selectedUserId), raceId, horseNumber })
@@ -285,7 +290,7 @@ const HorseBettingApp = () => {
       const data = await response.json();
       if (data.success) {
         // Refresh bets data to get updated state
-        const betsRes = await fetch(`${API_BASE}/bets`);
+        const betsRes = await apiFetch(`/bets`);
         const betsData = await betsRes.json();
         if (Array.isArray(betsData)) setBets(betsData);
         
@@ -307,8 +312,8 @@ const HorseBettingApp = () => {
         // If there's already a bet, make it a banker bet
         const race = races.find(r => r.id === raceId);
         const useAdminEndpoint = isAdminAuthenticated && race?.status === 'completed';
-        const endpoint = useAdminEndpoint ? `${API_BASE}/admin/banker` : `${API_BASE}/banker`;
-        const response = await fetch(endpoint, {
+        const endpoint = useAdminEndpoint ? `/admin/banker` : `/banker`;
+        const response = await apiFetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ userId: String(selectedUserId), raceId, horseNumber: currentBet.horse })
@@ -316,14 +321,14 @@ const HorseBettingApp = () => {
         const data = await response.json();
         if (data.success) {
           // Refresh bets and bankers data
-          const betsRes = await fetch(`${API_BASE}/bets`);
+          const betsRes = await apiFetch(`/bets`);
           const betsData = await betsRes.json();
           if (Array.isArray(betsData)) setBets(betsData);
           
           const bankersUrl = selectedRaceDay 
-            ? `${API_BASE}/bankers?race_date=${selectedRaceDay}`
-            : `${API_BASE}/bankers`;
-          const bankersRes = await fetch(bankersUrl);
+            ? `/bankers?race_date=${selectedRaceDay}`
+            : `/bankers`;
+          const bankersRes = await apiFetch(bankersUrl);
           const bankersData = await bankersRes.json();
           if (typeof bankersData === 'object' && bankersData !== null) setBankers(bankersData);
           
@@ -343,6 +348,24 @@ const HorseBettingApp = () => {
     fetchAllData();
   }, [fetchAllData]);
 
+  // Validate a restored session (token may have expired or user been deleted)
+  useEffect(() => {
+    if (!loadSession()) return;
+    apiFetch(`/users/me`)
+      .then(res => res.ok ? res.json() : Promise.reject())
+      .then(me => setIsAdminAuthenticated(!!me.is_admin))
+      .catch(() => { saveSession(null); setSelectedUserId(null); setIsAdminAuthenticated(false); });
+  }, []);
+
+  // Which bets are visible depends on who is logged in
+  const lastUserRef = useRef(selectedUserId);
+  useEffect(() => {
+    if (lastUserRef.current === selectedUserId) return;
+    lastUserRef.current = selectedUserId;
+    fetchAllData();
+    if (selectedRaceDay) fetchRaceDayData(selectedRaceDay);
+  }, [selectedUserId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleUserSelect = useCallback((userId) => {
     setPendingUserId(userId);
     setPinInput('');
@@ -355,20 +378,21 @@ const HorseBettingApp = () => {
       return;
     }
     try {
-      const response = await fetch(`${API_BASE}/users/login`, {
+      const response = await apiFetch(`/users/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: pendingUserId, pin: pinInput })
       });
       const data = await response.json();
       if (data.success) {
+        saveSession({ token: data.token, userId: pendingUserId });
         setSelectedUserId(pendingUserId);
         if (data.is_admin) setIsAdminAuthenticated(true);
         setShowPinModal(false);
         setPinInput('');
         setPendingUserId(null);
       } else {
-        showMessage('Wrong PIN. Try again.', 'error');
+        showMessage(response.status === 429 ? data.error : 'Wrong PIN. Try again.', 'error');
         setPinInput('');
       }
     } catch (error) {
@@ -377,6 +401,7 @@ const HorseBettingApp = () => {
   }, [pendingUserId, pinInput, showMessage]);
 
   const handleUserLogout = useCallback(() => {
+    saveSession(null);
     setSelectedUserId(null);
     setIsAdminAuthenticated(false);
     if (activeTab === 'admin') setActiveTab('home');
@@ -386,15 +411,16 @@ const HorseBettingApp = () => {
     if (!registerName.trim()) { showMessage('Please enter your name.', 'info'); return; }
     if (registerPin.length !== 4) { showMessage('PIN must be exactly 4 digits.', 'info'); return; }
     try {
-      const res = await fetch(`${API_BASE}/users`, {
+      const res = await apiFetch(`/users`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: registerName.trim(), pin: registerPin }),
       });
       const data = await res.json();
       if (!res.ok) { showMessage(data.error || 'Registration failed.', 'error'); return; }
-      await fetchAllData();
+      saveSession({ token: data.token, userId: data.id });
       setSelectedUserId(data.id);
+      await fetchAllData();
       setShowRegisterForm(false);
       setUserPickerOpen(false);
       setRegisterName('');
