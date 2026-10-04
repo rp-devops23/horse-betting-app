@@ -137,6 +137,11 @@ def is_locked_out(key: str) -> bool:
     return len(attempts) >= MAX_FAILED_ATTEMPTS
 
 
+def attempts_left(key: str) -> int:
+    is_locked_out(key)  # prunes expired attempts
+    return max(0, MAX_FAILED_ATTEMPTS - len(_failed_attempts[key]))
+
+
 def record_failed_attempt(key: str):
     _failed_attempts[key].append(time.time())
 

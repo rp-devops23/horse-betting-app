@@ -12,6 +12,15 @@ const STEPS = [
   { emoji: '🏆', title: 'Deviens champion', text: 'Chaque mois est une saison : le premier à la fin du mois remporte le trophée.', colour: 'bg-coral-100' },
 ];
 
+const PIN_HELP = [
+  { emoji: '🔢', title: '4 chiffres rien qu’à toi', text: 'Ton code te connecte à ton profil. Ne le partage pas : il protège tes paris.' },
+  { emoji: '📱', title: 'Une seule fois par appareil', text: 'Une fois connecté, l’app se souvient de toi. Après la nouvelle version, reconnecte-toi une fois avec ton code habituel.' },
+  { emoji: '🤔', title: 'Code oublié ?', text: 'Demande à un admin : il peut t’en mettre un nouveau en deux secondes.' },
+  { emoji: '⏸️', title: '5 erreurs = petite pause', text: 'Après 5 mauvais codes, il faut attendre 5 minutes avant de réessayer.' },
+  { emoji: '🙈', title: 'Même les admins ne le voient pas', text: 'Ton code est chiffré : personne ne peut le lire, seulement le remplacer.' },
+  { emoji: '🚪', title: 'Téléphone partagé ?', text: 'Touche ton nom en haut puis « Changer de joueur » pour laisser la place au suivant.' },
+];
+
 const TIER_COLOURS = ['bg-coral-100 text-coral-600', 'bg-sunny-100 text-sunny-600', 'bg-grape-100 text-grape-600', 'bg-mint-100 text-mint-600', 'bg-sky2-100 text-sky2-500'];
 
 const HomePage = ({ me, users, races, bets, bankers, selectedRaceDay, scoringConfig, onLogin, onGoToRaces, onOpenProfile, onGoToLeaderboard }) => {
@@ -153,6 +162,22 @@ const HomePage = ({ me, users, races, bets, bankers, selectedRaceDay, scoringCon
         ) : (
           <p className="text-sm text-grape-300">Chargement…</p>
         )}
+      </div>
+
+      {/* PIN help */}
+      <div className="card p-5 sm:p-6">
+        <h2 className="section-title mb-4">🔐 Ton code secret</h2>
+        <div className="grid sm:grid-cols-2 gap-3">
+          {PIN_HELP.map(item => (
+            <div key={item.title} className="flex gap-3 rounded-2xl bg-grape-50 p-4">
+              <span className="text-2xl">{item.emoji}</span>
+              <div>
+                <p className="font-display font-extrabold text-grape-900">{item.title}</p>
+                <p className="text-sm text-grape-600">{item.text}</p>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Fair play & privacy */}

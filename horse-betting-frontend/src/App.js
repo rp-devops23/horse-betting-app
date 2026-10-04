@@ -43,6 +43,7 @@ const HorseBettingApp = () => {
   const [pinInput, setPinInput] = useState('');
   const [pinShake, setPinShake] = useState(false);
   const [pinBusy, setPinBusy] = useState(false);
+  const [pinError, setPinError] = useState('');
   const [newUserPin, setNewUserPin] = useState('');
 
   // Self-registration state
@@ -367,6 +368,7 @@ const HorseBettingApp = () => {
 
   const handleUserSelect = useCallback((userId) => {
     setPendingUserId(userId);
+    setPinError('');
     setPinInput('');
   }, []);
 
@@ -380,6 +382,7 @@ const HorseBettingApp = () => {
       });
       const data = await response.json();
       if (data.success) {
+        setPinError('');
         saveSession({ token: data.token, userId: pendingUserId });
         setSelectedUserId(pendingUserId);
         if (data.is_admin) setIsAdminAuthenticated(true);
@@ -388,7 +391,15 @@ const HorseBettingApp = () => {
         setPendingUserId(null);
         showMessage(`Salut ${data.name || ''} ! 👋`, 'success');
       } else {
-        if (response.status === 429) showMessage(data.error, 'error');
+        if (response.status === 429) {
+          setPinError("Trop d'essais 😅 Fais une pause de 5 minutes, puis réessaie.");
+        } else if (data.attemptsLeft != null && data.attemptsLeft <= 3) {
+          setPinError(data.attemptsLeft > 0
+            ? `Mauvais code. Encore ${data.attemptsLeft} essai${data.attemptsLeft > 1 ? 's' : ''} avant une pause de 5 minutes.`
+            : "Mauvais code. Pause de 5 minutes avant de réessayer.");
+        } else {
+          setPinError('Mauvais code, réessaie !');
+        }
         setPinInput('');
         setPinShake(true);
         setTimeout(() => setPinShake(false), 600);
@@ -641,7 +652,11 @@ const HorseBettingApp = () => {
             <h3 className="font-display text-2xl font-extrabold text-grape-800">{pendingUser.name}</h3>
             <p className="text-grape-500 mb-5">Ton code secret à 4 chiffres</p>
             <PinPad value={pinInput} onChange={setPinInput} onSubmit={handlePinSubmit} shake={pinShake} busy={pinBusy} />
-            <button onClick={() => setPendingUserId(null)} className="mt-5 text-sm font-bold text-grape-400 hover:text-grape-600">← Ce n'est pas moi</button>
+            {pinError && <p className="mt-4 text-sm font-bold text-coral-500" role="alert">{pinError}</p>}
+            <p className="mt-4 text-xs text-grape-400">
+              Code oublié ? Demande à un admin de t'en mettre un nouveau — personne ne peut voir l'ancien, il est chiffré 🔐
+            </p>
+            <button onClick={() => setPendingUserId(null)} className="mt-3 text-sm font-bold text-grape-400 hover:text-grape-600">← Ce n'est pas moi</button>
           </div>
         ) : showRegisterForm ? (
           <div>
@@ -656,6 +671,9 @@ const HorseBettingApp = () => {
                 onKeyDown={e => e.key === 'Enter' && handleRegister()}
                 className="input text-center tracking-[0.5em]"
               />
+              <p className="text-xs text-grape-400">
+                🔐 Choisis 4 chiffres faciles à retenir pour toi (évite 1234 ou ton année de naissance !). Garde-le secret : il protège tes paris.
+              </p>
               <div className="flex gap-2 pt-1">
                 <button onClick={() => setShowRegisterForm(false)} className="btn-ghost flex-1">Retour</button>
                 <button onClick={handleRegister} className="btn-primary flex-1">C'est parti !</button>

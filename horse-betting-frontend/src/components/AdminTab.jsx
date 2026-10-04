@@ -305,6 +305,10 @@ const AdminTab = ({
 
   const renderUtilisateurs = () => (
     <div className="space-y-4">
+      <p className="text-xs text-grape-500 bg-grape-50 rounded-xl p-3">
+        🔐 Les codes PIN sont chiffrés : impossible de les afficher. Si un joueur a oublié le sien, clique sur ✏️ et saisis-en un nouveau (4 chiffres), puis donne-le-lui.
+      </p>
+
       {/* Add user */}
       <div className="flex gap-2">
         <input

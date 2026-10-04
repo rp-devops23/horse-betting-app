@@ -6,7 +6,7 @@ User-related routes with proper imports.
 from flask import Blueprint, jsonify, request
 from services import data_service
 from auth import (issue_token, current_auth, current_user_id, require_admin, require_user,
-                  is_locked_out, record_failed_attempt, clear_failed_attempts)
+                  is_locked_out, record_failed_attempt, clear_failed_attempts, attempts_left)
 
 users_bp = Blueprint('users', __name__)
 
@@ -42,7 +42,7 @@ def login_user():
         clear_failed_attempts(f'user:{user_id}')
         return jsonify({**result, "token": issue_token(user_id)}), 200
     record_failed_attempt(f'user:{user_id}')
-    return jsonify({"success": False, "error": "Invalid PIN"}), 401
+    return jsonify({"success": False, "error": "Invalid PIN", "attemptsLeft": attempts_left(f'user:{user_id}')}), 401
 
 @users_bp.route('/users/me', methods=['GET'])
 def get_me():
