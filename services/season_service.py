@@ -49,7 +49,6 @@ TROPHIES = [
     ('jackpot',       '💰', 'Jackpot',                'Marquer 25 points en une journée',                                   'epic',      'event', 25),
     ('triple_crown',  '🔥', 'Triplé royal',           'Finir 1er de 3 journées d’affilée',                                  'legendary', 'event', 3),
     ('champion',      '🏆', 'Champion de la saison',  'Remporter une saison',                                               'legendary', 'event', 1),
-    ('red_lantern',   '🐢', 'Lanterne rouge',         'Choisir 3 chevaux arrivés derniers dans la même journée',            'rare',      'event', 3),
     ('regular',       '📅', 'Pilier de l’hippodrome', 'Jouer 25 journées',                                                  'common',    'every', 25),
 ]
 
@@ -66,10 +65,16 @@ def _in_period(date: str, period: str) -> bool:
     return period == 'all' or date.startswith(period)
 
 
-def _rank(entries: List[Dict[str, Any]], key: str = 'score') -> None:
-    """Competition ranking (ties share a rank: 1, 1, 3), entries already sorted."""
+def _tie_key(score: int, wins: int):
+    """Points first, then number of winning horses; only both equal is a tie."""
+    return (score, wins)
+
+
+def _rank(entries: List[Dict[str, Any]]) -> None:
+    """Competition ranking (true ties share a rank: 1, 1, 3), entries already sorted."""
     for i, entry in enumerate(entries):
-        if i > 0 and entry[key] == entries[i - 1][key]:
+        prev = entries[i - 1] if i else None
+        if prev and _tie_key(entry['score'], entry['wins']) == _tie_key(prev['score'], prev['wins']):
             entry['rank'] = entries[i - 1]['rank']
         else:
             entry['rank'] = i + 1
@@ -138,20 +143,23 @@ class History:
 
     def day_ranks(self, date: str) -> Dict[str, int]:
         if date not in self._ranks:
-            ordered = sorted(self.day_scores[date].items(), key=lambda kv: -kv[1])
+            wins = self.day_wins[date]
+            keys = {uid: _tie_key(score, wins[uid]) for uid, score in self.day_scores[date].items()}
+            ordered = sorted(keys.items(), key=lambda kv: kv[1], reverse=True)
             ranks, prev, rank = {}, None, 0
-            for i, (uid, score) in enumerate(ordered):
-                if score != prev:
-                    rank, prev = i + 1, score
+            for i, (uid, key) in enumerate(ordered):
+                if key != prev:
+                    rank, prev = i + 1, key
                 ranks[uid] = rank
             self._ranks[date] = ranks
         return self._ranks[date]
 
     def day_winners(self, date: str) -> set:
-        """Players who topped the day (ties all count), if the top score is positive."""
+        """Players ranked 1st on the day (true ties all count), if the top score is positive."""
         scores = self.day_scores[date]
-        top = max(scores.values(), default=0)
-        return {uid for uid, s in scores.items() if s == top} if top > 0 else set()
+        if max(scores.values(), default=0) <= 0:
+            return set()
+        return {uid for uid, rank in self.day_ranks(date).items() if rank == 1}
 
     def crowns(self, period: str = 'all') -> Dict[str, int]:
         counts = defaultdict(int)
@@ -191,14 +199,14 @@ class History:
         for season in sorted({d[:4] for d in self.dates if d[:4] < current}):
             table = [e for e in self.standings(season) if e['daysPlayed']]
             if table and table[0]['score'] > 0:
-                champions[season] = [e['userId'] for e in table if e['score'] == table[0]['score']]
+                champions[season] = [e['userId'] for e in table if e['rank'] == 1]
         return champions
 
     # --- Per-player numbers ---
 
     def player_numbers(self, user_id: str) -> Dict[str, Any]:
         bets = self.bets_of(user_id)
-        winning, banker_total, banker_wins, last_picks = 0, 0, 0, 0
+        winning, banker_total, banker_wins = 0, 0, 0
         biggest = None
         for bet in bets:
             race = self.races[bet.race_id]
@@ -209,8 +217,6 @@ class History:
                 odds = (horse.odds or 0) if horse else 0
                 if horse and odds and (biggest is None or odds > biggest['odds']):
                     biggest = {'horse': horse.name, 'odds': odds, 'date': race.date}
-            elif race.last_horse_number == bet.horse_number:
-                last_picks += 1
             if bet.is_banker:
                 banker_total += 1
                 banker_wins += 1 if won else 0
@@ -239,7 +245,6 @@ class History:
             'totalScore': sum(p for _, p in day_points),
             'bestDay': {'date': best_day[0], 'score': best_day[1]} if best_day else None,
             'biggestUpset': biggest,
-            'lastPicks': last_picks,
             'bestStreak': best_streak,
             'currentStreak': streak,
         }
@@ -283,12 +288,9 @@ class History:
                 stat['jackpot'] += 1
 
         long_wins_by_day = defaultdict(int)
-        lasts_by_day = defaultdict(int)
         for bet in self.bets_of(user_id):
             race = self.races[bet.race_id]
             if race.winner_horse_number != bet.horse_number:
-                if race.last_horse_number == bet.horse_number:
-                    lasts_by_day[race.date] += 1
                 continue
             horse = self.horses.get((race.id, bet.horse_number))
             odds = (horse.odds or 0) if horse else 0
@@ -309,10 +311,6 @@ class History:
             best['double_long'] = max(best['double_long'], count)
             if count >= 2:
                 stat['double_long'] += 1
-        for count in lasts_by_day.values():
-            best['red_lantern'] = max(best['red_lantern'], count)
-            if count >= 3:
-                stat['red_lantern'] += 1
         stat['champion'] = sum(1 for winners in champions.values() if user_id in winners)
 
         result = []

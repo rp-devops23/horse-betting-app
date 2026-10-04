@@ -154,6 +154,7 @@ const LeaderboardTab = ({ users, selectedUserId, showMessage, onOpenProfile }) =
                       <span className="font-display text-xl font-extrabold text-grape-600 leading-none">
                         {group.entries[0].score} <span className="text-xs">pts</span>
                       </span>
+                      <span className="text-xs font-bold text-grape-400">🐎 {group.entries[0].wins} gagnant{group.entries[0].wins !== 1 ? 's' : ''}</span>
                       {tied && <span className="chip bg-white text-grape-500 border border-grape-100 mt-1">ex æquo</span>}
                       <div className={`w-full mt-2 ${step.height} ${step.colour} rounded-t-2xl flex items-start justify-center pt-2 text-3xl`}>
                         {group.entries.map((e) => <span key={e.userId}>{step.medal}</span>)}
@@ -181,7 +182,7 @@ const LeaderboardTab = ({ users, selectedUserId, showMessage, onOpenProfile }) =
                     <div className="flex-1 min-w-0">
                       <p className="font-display font-extrabold text-grape-900 truncate">{entry.name}{isMe && <span className="text-grape-400 font-bold text-sm"> (toi)</span>}</p>
                       <p className="text-xs text-grape-400 truncate">
-                        {entry.daysPlayed} journée{entry.daysPlayed !== 1 ? 's' : ''} · {entry.crowns} 👑
+                        {entry.daysPlayed} journée{entry.daysPlayed !== 1 ? 's' : ''} · {entry.wins} 🐎 · {entry.crowns} 👑
                         {entry.badges?.length > 0 && <span className="ml-1 tracking-tighter">{entry.badges.join('')}</span>}
                       </p>
                     </div>

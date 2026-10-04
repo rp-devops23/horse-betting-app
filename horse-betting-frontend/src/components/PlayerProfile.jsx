@@ -140,7 +140,7 @@ const PlayerProfile = ({ userId, users, isMe, onBack, onEditAvatar, onOpenProfil
         <StatTile emoji="🚀" label="Meilleur jour" value={s.bestDay ? `${s.bestDay.score} pts` : '—'} sub={s.bestDay ? formatDay(s.bestDay.date, { day: 'numeric', month: 'long', year: 'numeric' }) : ''} tone="sky" />
         <StatTile emoji="🦄" label="Gros coup" value={s.biggestUpset ? `cote ${s.biggestUpset.odds}` : '—'} sub={s.biggestUpset?.horse} tone="grape" />
         <StatTile emoji="🔥" label="Série" value={s.currentStreak} sub={`record : ${s.bestStreak} journées`} tone="coral" />
-        <StatTile emoji="🐢" label="Lanterne rouge" value={s.lastPicks} sub="chevaux arrivés derniers" tone="mint" />
+        <StatTile emoji="🐎" label="Gagnants" value={s.wins} sub={`en ${s.daysPlayed} journée${s.daysPlayed > 1 ? 's' : ''}`} tone="mint" />
       </div>
 
       {/* Form */}
