@@ -20,15 +20,40 @@ def get_races():
 @races_bp.route('/races/scrape', methods=['POST'])
 def scrape_races():
     """Scrapes races for a new race day and sets it as current."""
+    log_id = None
     try:
         date_str = _json().get('date')  # optional: "YYYY-MM-DD"
+        log_id = data_service.log_job('scrape_races', 'started', race_date=date_str,
+                                       message='Importing races from supertote.mu')
         current_day = data_service.scrape_new_races(date_str)
-        data_service.save_current_race_day_data(current_day)
+        race_date = current_day.get('date')
         n = len(current_day.get('races', []))
-        print(f"[OK] Scraped {n} races for {current_day.get('date')} (supertote.mu)")
-        return jsonify({"success": True, "message": f"{n} courses importées depuis supertote.mu.", "date": current_day.get('date')}), 200
+
+        # Take snapshot of existing horse odds before overwriting
+        from models import Race as RaceModel, Horse as HorseModel, JobLog
+        from database import db
+        import json as _json_mod
+        existing_races = RaceModel.query.filter_by(date=race_date).all()
+        snapshot = {}
+        for r in existing_races:
+            horses = HorseModel.query.filter_by(race_id=r.id).all()
+            snapshot[str(r.race_number)] = {str(h.horse_number): {'name': h.name, 'odds': h.odds} for h in horses}
+        if snapshot:
+            job_log = JobLog.query.get(log_id)
+            if job_log:
+                job_log.snapshot = _json_mod.dumps(snapshot)
+                db.session.commit()
+
+        data_service.save_current_race_day_data(current_day)
+        data_service.update_job_log(log_id, 'success',
+                                     message=f'{n} courses importées depuis supertote.mu.',
+                                     details={'races_count': n, 'date': race_date})
+        print(f"[OK] Scraped {n} races for {race_date} (supertote.mu)")
+        return jsonify({"success": True, "message": f"{n} courses importées depuis supertote.mu.", "date": race_date}), 200
     except Exception as e:
         print(f"[ERROR] /races/scrape: {e}")
+        if log_id:
+            data_service.update_job_log(log_id, 'error', message=str(e))
         return jsonify({"success": False, "error": str(e)}), 500
 
 @races_bp.route('/races/<race_id>/result', methods=['POST'])
@@ -151,6 +176,7 @@ def update_horse_odds(race_id, horse_number):
 @races_bp.route('/races/update-odds', methods=['POST'])
 def update_odds():
     """Scrapes live Win odds from smspariaz.com and updates the current race day."""
+    log_id = None
     try:
         from utils.smspariaz_odds_scraper import scrape_odds_from_smspariaz
         from models import Race as RaceModel
@@ -159,35 +185,52 @@ def update_odds():
             today = datetime.now().strftime('%Y-%m-%d')
             next_race = RaceModel.query.filter(RaceModel.date >= today).order_by(RaceModel.date).first()
             date_str = next_race.date if next_race else today
+        log_id = data_service.log_job('update_odds', 'started', race_date=date_str,
+                                       message='Fetching odds from smspariaz.com')
         print(f"[INFO] update-odds: targeting race day {date_str}")
         odds_data = scrape_odds_from_smspariaz()
         if not odds_data:
+            data_service.update_job_log(log_id, 'error', message='Aucune côte trouvée sur smspariaz.com',
+                                         details={'races_in_response': 0})
             return jsonify({"success": False, "error": "Aucune côte trouvée sur smspariaz.com"}), 200
+        races_with_odds = {k: len(v) for k, v in odds_data.items()}
         n = data_service.update_race_day_odds(date_str, odds_data)
+        data_service.update_job_log(log_id, 'success',
+                                     message=f'{n} côte(s) mise(s) à jour.',
+                                     details={'horses_updated': n, 'races_in_response': races_with_odds})
         print(f"[OK] Updated odds for {n} horse(s) on {date_str} (smspariaz.com)")
         return jsonify({"success": True, "message": f"{n} côte(s) mise(s) à jour.", "date": date_str}), 200
     except Exception as e:
         print(f"[ERROR] /races/update-odds: {e}")
+        if log_id:
+            data_service.update_job_log(log_id, 'error', message=str(e))
         return jsonify({"success": False, "error": str(e)}), 500
 
 @races_bp.route('/races/results', methods=['POST'])
 def scrape_results():
     """Scrapes results from supertote.mu and applies them to the DB."""
+    log_id = None
     try:
         from models import Race as RaceModel
         date_str = _json().get('date')
         if not date_str:
             today = datetime.now().strftime('%Y-%m-%d')
-            # Find most recent race day on/before today that still has races without a winner
             race = RaceModel.query.filter(
                 RaceModel.date <= today,
                 RaceModel.winner_horse_number == None
             ).order_by(RaceModel.date.desc()).first()
             date_str = race.date if race else today
+        log_id = data_service.log_job('scrape_results', 'started', race_date=date_str,
+                                       message='Fetching results from supertote.mu')
         print(f"[INFO] /races/results: targeting race day {date_str}")
         data = data_service.scrape_race_results(date_str)
         n = data.get('count', 0)
+        data_service.update_job_log(log_id, 'success',
+                                     message=f'{n} résultat(s) importé(s) pour le {date_str}.',
+                                     details={'results_applied': n, 'date': date_str})
         return jsonify({"success": True, "message": f"{n} résultat(s) importé(s) pour le {data.get('date')}.", "date": date_str, "data": data}), 200
     except Exception as e:
         print(f"[ERROR] /races/results: {e}")
+        if log_id:
+            data_service.update_job_log(log_id, 'error', message=str(e))
         return jsonify({"success": False, "error": str(e)}), 500

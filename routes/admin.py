@@ -156,6 +156,23 @@ def delete_horse(race_id, horse_number):
     return jsonify({"success": True, "message": f"Horse #{horse_number} deleted from race {race_id}"}), 200
 
 
+@admin_bp.route('/bet', methods=['POST'])
+def admin_place_bet():
+    """Admin: place or change any bet for any user, bypassing all restrictions."""
+    data = request.get_json(force=True) or {}
+    user_id = data.get('userId')
+    race_id = data.get('raceId')
+    horse_number = data.get('horseNumber')
+    is_banker = bool(data.get('isBanker', False))
+    admin_id = data.get('adminId')
+    if not all([user_id, race_id, horse_number, admin_id]):
+        return jsonify({"error": "userId, raceId, horseNumber and adminId are required"}), 400
+    success = data_service.place_bet(user_id, race_id, int(horse_number), is_banker=is_banker, force=True, changed_by=admin_id)
+    if success:
+        return jsonify({"success": True}), 200
+    return jsonify({"success": False, "error": "Failed to place bet"}), 500
+
+
 @admin_bp.route('/banker', methods=['POST'])
 def admin_set_banker():
     """Force-set a banker for any user on any race, bypassing the completed-race restriction."""
@@ -163,12 +180,96 @@ def admin_set_banker():
     user_id = data.get('userId')
     race_id = data.get('raceId')
     horse_number = data.get('horseNumber')
+    admin_id = data.get('adminId')
     if not all([user_id, race_id, horse_number]):
         return jsonify({"error": "userId, raceId and horseNumber are required"}), 400
-    success = data_service.place_bet(user_id, race_id, int(horse_number), is_banker=True, force=True)
+    success = data_service.place_bet(user_id, race_id, int(horse_number), is_banker=True, force=True, changed_by=admin_id)
     if success:
         return jsonify({"success": True}), 200
     return jsonify({"success": False, "error": "Failed to set banker"}), 500
+
+
+@admin_bp.route('/bet-logs', methods=['GET'])
+def get_bet_logs():
+    """Returns bet change logs, optionally filtered by race_date or user_id."""
+    from models import BetLog, User, Race, Horse
+    race_date = request.args.get('race_date')
+    user_id = request.args.get('user_id')
+
+    query = BetLog.query.join(Race).join(User)
+    if race_date:
+        query = query.filter(Race.date == race_date)
+    if user_id:
+        query = query.filter(BetLog.user_id == user_id)
+
+    logs = query.order_by(BetLog.timestamp.desc()).limit(200).all()
+
+    result = []
+    for log in logs:
+        # Resolve horse names
+        old_horse = None
+        new_horse = None
+        if log.old_horse_number:
+            h = Horse.query.filter_by(race_id=log.race_id, horse_number=log.old_horse_number).first()
+            old_horse = h.name if h else None
+        h = Horse.query.filter_by(race_id=log.race_id, horse_number=log.new_horse_number).first()
+        new_horse = h.name if h else None
+
+        # Resolve admin name if changed_by is set
+        admin_name = None
+        if log.changed_by:
+            admin_user = User.query.get(log.changed_by)
+            admin_name = admin_user.name if admin_user else log.changed_by
+
+        result.append({
+            "id": log.id,
+            "userId": log.user_id,
+            "userName": log.user.name,
+            "raceId": log.race_id,
+            "raceDate": log.race.date,
+            "raceNumber": log.race.race_number,
+            "action": log.action,
+            "oldHorseNumber": log.old_horse_number,
+            "oldHorseName": old_horse,
+            "newHorseNumber": log.new_horse_number,
+            "newHorseName": new_horse,
+            "oldIsBanker": log.old_is_banker,
+            "newIsBanker": log.new_is_banker,
+            "changedBy": admin_name,
+            "timestamp": log.timestamp.isoformat()
+        })
+    return jsonify(result)
+
+
+@admin_bp.route('/job-logs', methods=['GET'])
+def get_job_logs():
+    """Returns job execution logs, optionally filtered by job_type or race_date."""
+    from models import JobLog
+    import json
+    job_type = request.args.get('job_type')
+    race_date = request.args.get('race_date')
+
+    query = JobLog.query
+    if job_type:
+        query = query.filter(JobLog.job_type == job_type)
+    if race_date:
+        query = query.filter(JobLog.race_date == race_date)
+
+    logs = query.order_by(JobLog.timestamp.desc()).limit(100).all()
+
+    result = []
+    for log in logs:
+        result.append({
+            "id": log.id,
+            "jobType": log.job_type,
+            "status": log.status,
+            "raceDate": log.race_date,
+            "message": log.message,
+            "details": json.loads(log.details) if log.details else None,
+            "hasSnapshot": log.snapshot is not None,
+            "timestamp": log.timestamp.isoformat()
+        })
+    return jsonify(result)
 
 
 @admin_bp.route('/reset-data', methods=['POST'])

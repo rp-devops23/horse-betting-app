@@ -62,6 +62,33 @@ class Bet(db.Model):
     is_banker = db.Column(db.Boolean, default=False)
     points_awarded = db.Column(db.Integer, nullable=True)
 
+class BetLog(db.Model):
+    __tablename__ = 'bet_logs'
+    id = db.Column(db.String, primary_key=True)
+    user_id = db.Column(db.String, db.ForeignKey('users.id'), nullable=False)
+    race_id = db.Column(db.String, db.ForeignKey('races.id'), nullable=False)
+    action = db.Column(db.String, nullable=False)  # 'placed', 'changed', 'banker_set', 'banker_moved'
+    old_horse_number = db.Column(db.Integer, nullable=True)
+    new_horse_number = db.Column(db.Integer, nullable=False)
+    old_is_banker = db.Column(db.Boolean, nullable=True)
+    new_is_banker = db.Column(db.Boolean, nullable=False)
+    changed_by = db.Column(db.String, nullable=True)  # null = user self, otherwise admin user_id
+    timestamp = db.Column(db.DateTime, nullable=False)
+
+    user = db.relationship('User', backref=db.backref('bet_logs', lazy=True))
+    race = db.relationship('Race', backref=db.backref('bet_logs', lazy=True))
+
+class JobLog(db.Model):
+    __tablename__ = 'job_logs'
+    id = db.Column(db.String, primary_key=True)
+    job_type = db.Column(db.String, nullable=False)  # 'scrape_races', 'update_odds', 'scrape_results'
+    status = db.Column(db.String, nullable=False)  # 'started', 'success', 'error'
+    race_date = db.Column(db.String, nullable=True)
+    message = db.Column(db.Text, nullable=True)
+    details = db.Column(db.Text, nullable=True)  # JSON string with extra context (e.g. horses updated, races found)
+    snapshot = db.Column(db.Text, nullable=True)  # JSON snapshot of affected data before the job ran (for rollback)
+    timestamp = db.Column(db.DateTime, nullable=False)
+
 class UserScore(db.Model):
     __tablename__ = 'user_scores'
     id = db.Column(db.String, primary_key=True)

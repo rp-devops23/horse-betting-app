@@ -1,26 +1,66 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Settings, Users, Plus, Calendar, Edit2, Trash2, Check, X, LogOut, Download, Upload, Eye, EyeOff, Sliders, ShieldCheck } from 'lucide-react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { Settings, Users, Plus, Calendar, Edit2, Trash2, Check, X, LogOut, Download, Upload, Eye, EyeOff, Sliders, ShieldCheck, ClipboardList, Database } from 'lucide-react';
 import API_BASE from '../config';
 import { BADGE_COLOURS, initials } from '../utils/userColors';
+
+/* ── Action labels ── */
+const BET_ACTION_LABELS = {
+  placed: 'Pari placé',
+  changed: 'Changement',
+  banker_set: 'Banquier ajouté',
+  banker_moved: 'Banquier retiré',
+};
+
+const JOB_TYPE_LABELS = {
+  scrape_races: 'Import courses',
+  update_odds: 'Mise à jour côtes',
+  scrape_results: 'Import résultats',
+};
+
+const JOB_STATUS_COLORS = {
+  started: 'bg-yellow-100 text-yellow-800',
+  success: 'bg-green-100 text-green-800',
+  error: 'bg-red-100 text-red-800',
+};
+
+/* ── Sub-tab definitions ── */
+const SUB_TABS = [
+  { key: 'courses',      label: 'Courses',      icon: Calendar },
+  { key: 'utilisateurs', label: 'Utilisateurs', icon: Users },
+  { key: 'points',       label: 'Points',       icon: Sliders },
+  { key: 'journaux',     label: 'Journaux',     icon: ClipboardList },
+  { key: 'donnees',      label: 'Données',      icon: Database },
+];
 
 const AdminTab = ({
   newUserName, setNewUserName, newUserPin, setNewUserPin,
   handleAddUser, handleUpdateUser, handleDeleteUser,
   users, clearAllUserData, handleAdminLogout, showMessage, fetchAllData, setUsers,
 }) => {
+  const [activeSubTab, setActiveSubTab] = useState('courses');
   const [editingUserId, setEditingUserId] = useState(null);
   const [editingUserName, setEditingUserName] = useState('');
   const [editingUserPin, setEditingUserPin] = useState('');
   const [usersWithPins, setUsersWithPins] = useState([]);
-  const [showPins, setShowPins] = useState({}); // { userId: true/false }
+  const [showPins, setShowPins] = useState({});
   const [restoring, setRestoring] = useState(false);
-  const [loadingAction, setLoadingAction] = useState(null); // 'scrape' | 'odds' | 'results' | 'refresh'
+  const [loadingAction, setLoadingAction] = useState(null);
   const [refreshDate, setRefreshDate] = useState(() => new Date().toISOString().slice(0, 10));
   const restoreInputRef = useRef(null);
 
   // Scoring config state
   const [scoringConfig, setScoringConfig] = useState(null);
   const [savingScoring, setSavingScoring] = useState(false);
+
+  // Bet logs state
+  const [betLogs, setBetLogs] = useState([]);
+  const [betLogsDate, setBetLogsDate] = useState('');
+  const [betLogsLoading, setBetLogsLoading] = useState(false);
+
+  // Job logs state
+  const [jobLogs, setJobLogs] = useState([]);
+  const [jobTypeFilter, setJobTypeFilter] = useState('');
+  const [jobLogsLoading, setJobLogsLoading] = useState(false);
 
   // Fetch users with PINs whenever the users list changes
   useEffect(() => {
@@ -43,6 +83,36 @@ const AdminTab = ({
     };
     fetchScoringConfig();
   }, []);
+
+  // Fetch bet logs
+  const fetchBetLogs = useCallback(async () => {
+    setBetLogsLoading(true);
+    try {
+      const params = betLogsDate ? `?race_date=${betLogsDate}` : '';
+      const res = await fetch(`${API_BASE}/admin/bet-logs${params}`);
+      if (res.ok) setBetLogs(await res.json());
+    } catch { /* silently ignore */ }
+    finally { setBetLogsLoading(false); }
+  }, [betLogsDate]);
+
+  // Fetch job logs
+  const fetchJobLogs = useCallback(async () => {
+    setJobLogsLoading(true);
+    try {
+      const params = jobTypeFilter ? `?job_type=${jobTypeFilter}` : '';
+      const res = await fetch(`${API_BASE}/admin/job-logs${params}`);
+      if (res.ok) setJobLogs(await res.json());
+    } catch { /* silently ignore */ }
+    finally { setJobLogsLoading(false); }
+  }, [jobTypeFilter]);
+
+  // Auto-fetch logs when switching to journaux tab or when filters change
+  useEffect(() => {
+    if (activeSubTab === 'journaux') {
+      fetchBetLogs();
+      fetchJobLogs();
+    }
+  }, [activeSubTab, fetchBetLogs, fetchJobLogs]);
 
   const handleSaveScoringConfig = async () => {
     if (!scoringConfig) return;
@@ -211,195 +281,166 @@ const AdminTab = ({
     finally { setLoadingAction(null); }
   };
 
-  return (
-    <div className="bg-white p-6 rounded-b-lg shadow-lg space-y-6">
+  /* ── Spinner SVG helper ── */
+  const Spinner = () => (
+    <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+    </svg>
+  );
 
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold flex items-center gap-2 text-indigo-700">
-          <Settings className="w-6 h-6" />
-          Admin
-        </h2>
+  /* ════════════════════════════════════════════════
+     Sub-tab content renderers
+     ════════════════════════════════════════════════ */
+
+  const renderUtilisateurs = () => (
+    <div className="space-y-4">
+      {/* Add user */}
+      <div className="flex gap-2">
+        <input
+          type="text"
+          className="flex-1 min-w-0 p-2 border rounded-md text-sm"
+          placeholder="Prénom"
+          value={newUserName}
+          onChange={(e) => setNewUserName(e.target.value)}
+        />
+        <input
+          type="password"
+          inputMode="numeric"
+          maxLength={4}
+          className="w-16 p-2 border rounded-md text-center tracking-widest text-sm flex-shrink-0"
+          placeholder="PIN"
+          value={newUserPin}
+          onChange={(e) => setNewUserPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+        />
+        <button onClick={handleAddUser} className="bg-green-500 text-white p-2 rounded-md hover:bg-green-600 transition-colors flex-shrink-0">
+          <Plus className="w-5 h-5" />
+        </button>
+      </div>
+
+      {/* User list */}
+      {users.length > 0 && (
+        <div className="space-y-2">
+          {users.map((user, index) => {
+            const colour = BADGE_COLOURS[index % BADGE_COLOURS.length];
+            const pin = getPinForUser(user.id);
+            const pinVisible = showPins[user.id];
+
+            return (
+              <div key={user.id} className="bg-white rounded-md border p-2">
+                {editingUserId === user.id ? (
+                  <div className="flex items-center gap-2">
+                    <span className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white ${colour}`}>
+                      {initials(editingUserName || user.name)}
+                    </span>
+                    <input
+                      type="text"
+                      value={editingUserName}
+                      onChange={(e) => setEditingUserName(e.target.value)}
+                      className="flex-1 p-1 border rounded text-sm"
+                      placeholder="Prénom"
+                      autoFocus
+                    />
+                    <input
+                      type="password"
+                      inputMode="numeric"
+                      maxLength={4}
+                      value={editingUserPin}
+                      onChange={(e) => setEditingUserPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                      className="w-16 p-1 border rounded text-sm text-center tracking-widest"
+                      placeholder="PIN"
+                    />
+                    <button onClick={handleSaveEdit} className="p-1 text-green-600 hover:bg-green-100 rounded" title="Enregistrer">
+                      <Check className="w-4 h-4" />
+                    </button>
+                    <button onClick={handleCancelEdit} className="p-1 text-gray-500 hover:bg-gray-100 rounded" title="Annuler">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white ${colour}`}>
+                      {initials(user.name)}
+                    </span>
+                    <span className="flex-1 min-w-0 text-sm font-medium truncate">{user.name}</span>
+                    {user.is_admin && <ShieldCheck className="w-4 h-4 text-indigo-500 flex-shrink-0" title="Admin" />}
+                    <span className="text-sm font-mono text-gray-500 w-10 text-center flex-shrink-0">
+                      {pinVisible ? pin : '••••'}
+                    </span>
+                    <button onClick={() => toggleShowPin(user.id)} className="p-1 text-gray-400 hover:text-gray-700 rounded flex-shrink-0" title={pinVisible ? 'Masquer PIN' : 'Voir PIN'}>
+                      {pinVisible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                    <button onClick={() => handleToggleAdmin(user.id, user.is_admin)} className={`p-1 rounded flex-shrink-0 ${user.is_admin ? 'text-indigo-500 hover:bg-indigo-50' : 'text-gray-300 hover:text-indigo-400'}`} title={user.is_admin ? 'Retirer accès admin' : 'Donner accès admin'}>
+                      <ShieldCheck className="w-4 h-4" />
+                    </button>
+                    <button onClick={() => handleStartEdit(user)} className="p-1 text-blue-600 hover:bg-blue-100 rounded flex-shrink-0" title="Modifier">
+                      <Edit2 className="w-4 h-4" />
+                    </button>
+                    <button onClick={() => handleDeleteUser(user.id)} className="p-1 text-red-600 hover:bg-red-100 rounded flex-shrink-0" title="Supprimer">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <button onClick={clearAllUserData} className="w-full bg-red-500 text-white p-2 rounded-md hover:bg-red-600 transition-colors text-sm">
+        Effacer TOUTES les données utilisateurs
+      </button>
+    </div>
+  );
+
+  const renderCourses = () => (
+    <div className="space-y-4">
+      {[
+        { key: 'scrape',  label: 'Importer les courses',       sub: 'supertote.mu',   color: 'bg-indigo-500 hover:bg-indigo-600', handler: handleScrapeRaces },
+        { key: 'odds',    label: 'Mettre à jour les côtes',    sub: 'smspariaz.com',  color: 'bg-orange-500 hover:bg-orange-600', handler: handleUpdateOdds },
+        { key: 'results', label: 'Récupérer les résultats',    sub: 'supertote.mu',   color: 'bg-green-600 hover:bg-green-700',   handler: handleScrapeResults },
+      ].map(({ key, label, sub, color, handler }) => (
         <button
-          onClick={handleAdminLogout}
-          className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors"
+          key={key}
+          onClick={handler}
+          disabled={loadingAction !== null}
+          className={`w-full ${color} text-white p-2 rounded-md transition-colors text-sm flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed`}
         >
-          <LogOut className="w-4 h-4" />
-          Déconnexion
+          {loadingAction === key ? (
+            <><Spinner /> En cours…</>
+          ) : (
+            <>{label} <span className="opacity-70 text-xs">({sub})</span></>
+          )}
+        </button>
+      ))}
+
+      {/* Refresh scores */}
+      <div className="flex gap-2 items-center">
+        <input
+          type="date"
+          value={refreshDate}
+          onChange={e => setRefreshDate(e.target.value)}
+          className="flex-1 p-2 border rounded-md text-sm bg-white"
+        />
+        <button
+          onClick={handleRefreshScores}
+          disabled={loadingAction !== null}
+          className="flex-1 bg-purple-600 hover:bg-purple-700 text-white p-2 rounded-md transition-colors text-sm flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          {loadingAction === 'refresh' ? (
+            <><Spinner /> En cours…</>
+          ) : (
+            'Recalculer les scores'
+          )}
         </button>
       </div>
+    </div>
+  );
 
-      {/* ── User Management ── */}
-      <div className="bg-gray-100 p-4 rounded-lg space-y-4">
-        <h3 className="font-bold text-lg flex items-center gap-2 text-indigo-600">
-          <Users className="w-5 h-5" />
-          Utilisateurs
-        </h3>
-
-        {/* Add user */}
-        <div className="flex gap-2">
-          <input
-            type="text"
-            className="flex-1 min-w-0 p-2 border rounded-md text-sm"
-            placeholder="Prénom"
-            value={newUserName}
-            onChange={(e) => setNewUserName(e.target.value)}
-          />
-          <input
-            type="password"
-            inputMode="numeric"
-            maxLength={4}
-            className="w-16 p-2 border rounded-md text-center tracking-widest text-sm flex-shrink-0"
-            placeholder="PIN"
-            value={newUserPin}
-            onChange={(e) => setNewUserPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
-          />
-          <button onClick={handleAddUser} className="bg-green-500 text-white p-2 rounded-md hover:bg-green-600 transition-colors flex-shrink-0">
-            <Plus className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* User list */}
-        {users.length > 0 && (
-          <div className="space-y-2">
-            {users.map((user, index) => {
-              const colour = BADGE_COLOURS[index % BADGE_COLOURS.length];
-              const pin = getPinForUser(user.id);
-              const pinVisible = showPins[user.id];
-
-              return (
-                <div key={user.id} className="bg-white rounded-md border p-2">
-                  {editingUserId === user.id ? (
-                    <div className="flex items-center gap-2">
-                      <span className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white ${colour}`}>
-                        {initials(editingUserName || user.name)}
-                      </span>
-                      <input
-                        type="text"
-                        value={editingUserName}
-                        onChange={(e) => setEditingUserName(e.target.value)}
-                        className="flex-1 p-1 border rounded text-sm"
-                        placeholder="Prénom"
-                        autoFocus
-                      />
-                      <input
-                        type="password"
-                        inputMode="numeric"
-                        maxLength={4}
-                        value={editingUserPin}
-                        onChange={(e) => setEditingUserPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                        className="w-16 p-1 border rounded text-sm text-center tracking-widest"
-                        placeholder="PIN"
-                      />
-                      <button onClick={handleSaveEdit} className="p-1 text-green-600 hover:bg-green-100 rounded" title="Enregistrer">
-                        <Check className="w-4 h-4" />
-                      </button>
-                      <button onClick={handleCancelEdit} className="p-1 text-gray-500 hover:bg-gray-100 rounded" title="Annuler">
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white ${colour}`}>
-                        {initials(user.name)}
-                      </span>
-                      <span className="flex-1 min-w-0 text-sm font-medium truncate">{user.name}</span>
-                      {user.is_admin && <ShieldCheck className="w-4 h-4 text-indigo-500 flex-shrink-0" title="Admin" />}
-                      {/* PIN display */}
-                      <span className="text-sm font-mono text-gray-500 w-10 text-center flex-shrink-0">
-                        {pinVisible ? pin : '••••'}
-                      </span>
-                      <button onClick={() => toggleShowPin(user.id)} className="p-1 text-gray-400 hover:text-gray-700 rounded flex-shrink-0" title={pinVisible ? 'Masquer PIN' : 'Voir PIN'}>
-                        {pinVisible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
-                      <button onClick={() => handleToggleAdmin(user.id, user.is_admin)} className={`p-1 rounded flex-shrink-0 ${user.is_admin ? 'text-indigo-500 hover:bg-indigo-50' : 'text-gray-300 hover:text-indigo-400'}`} title={user.is_admin ? 'Retirer accès admin' : 'Donner accès admin'}>
-                        <ShieldCheck className="w-4 h-4" />
-                      </button>
-                      <button onClick={() => handleStartEdit(user)} className="p-1 text-blue-600 hover:bg-blue-100 rounded flex-shrink-0" title="Modifier">
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                      <button onClick={() => handleDeleteUser(user.id)} className="p-1 text-red-600 hover:bg-red-100 rounded flex-shrink-0" title="Supprimer">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        <button onClick={clearAllUserData} className="w-full bg-red-500 text-white p-2 rounded-md hover:bg-red-600 transition-colors text-sm">
-          Effacer TOUTES les données utilisateurs
-        </button>
-      </div>
-
-      {/* ── Race Day Management ── */}
-      <div className="bg-gray-100 p-4 rounded-lg space-y-4">
-        <h3 className="font-bold text-lg flex items-center gap-2 text-indigo-600">
-          <Calendar className="w-5 h-5" />
-          Journées de courses
-        </h3>
-        {[
-          { key: 'scrape',  label: 'Importer les courses',       sub: 'supertote.mu',   color: 'bg-indigo-500 hover:bg-indigo-600', handler: handleScrapeRaces },
-          { key: 'odds',    label: 'Mettre à jour les côtes',    sub: 'smspariaz.com',  color: 'bg-orange-500 hover:bg-orange-600', handler: handleUpdateOdds },
-          { key: 'results', label: 'Récupérer les résultats',    sub: 'supertote.mu',   color: 'bg-green-600 hover:bg-green-700',   handler: handleScrapeResults },
-        ].map(({ key, label, sub, color, handler }) => (
-          <button
-            key={key}
-            onClick={handler}
-            disabled={loadingAction !== null}
-            className={`w-full ${color} text-white p-2 rounded-md transition-colors text-sm flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed`}
-          >
-            {loadingAction === key ? (
-              <>
-                <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
-                </svg>
-                En cours…
-              </>
-            ) : (
-              <>{label} <span className="opacity-70 text-xs">({sub})</span></>
-            )}
-          </button>
-        ))}
-
-        {/* Refresh scores */}
-        <div className="flex gap-2 items-center">
-          <input
-            type="date"
-            value={refreshDate}
-            onChange={e => setRefreshDate(e.target.value)}
-            className="flex-1 p-2 border rounded-md text-sm bg-white"
-          />
-          <button
-            onClick={handleRefreshScores}
-            disabled={loadingAction !== null}
-            className="flex-1 bg-purple-600 hover:bg-purple-700 text-white p-2 rounded-md transition-colors text-sm flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
-          >
-            {loadingAction === 'refresh' ? (
-              <>
-                <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
-                </svg>
-                En cours…
-              </>
-            ) : (
-              'Recalculer les scores'
-            )}
-          </button>
-        </div>
-      </div>
-
-      {/* ── Scoring Config ── */}
-      {scoringConfig && (
-        <div className="bg-gray-100 p-4 rounded-lg space-y-4">
-          <h3 className="font-bold text-lg flex items-center gap-2 text-indigo-600">
-            <Sliders className="w-5 h-5" />
-            Système de points
-          </h3>
+  const renderPoints = () => (
+    <div className="space-y-4">
+      {scoringConfig ? (
+        <>
           <p className="text-xs text-gray-500">Points attribués selon la cote du cheval gagnant. Les seuils sont comparés du plus élevé au plus bas.</p>
 
           {/* Tiers */}
@@ -468,32 +509,226 @@ const AdminTab = ({
             <Check className="w-4 h-4" />
             {savingScoring ? 'Sauvegarde…' : 'Sauvegarder la configuration'}
           </button>
-        </div>
+        </>
+      ) : (
+        <p className="text-sm text-gray-400 text-center py-4">Chargement de la configuration…</p>
       )}
+    </div>
+  );
 
-      {/* ── Backup & Restore ── */}
-      <div className="bg-gray-100 p-4 rounded-lg space-y-4">
-        <h3 className="font-bold text-lg flex items-center gap-2 text-indigo-600">
-          <Download className="w-5 h-5" />
-          Sauvegarde &amp; Restauration
-        </h3>
-        <button onClick={handleDownloadBackup} className="w-full flex items-center justify-center gap-2 bg-indigo-500 text-white p-2 rounded-md hover:bg-indigo-600 transition-colors text-sm">
-          <Download className="w-4 h-4" />
-          Télécharger la sauvegarde
-        </button>
-        <div>
-          <input type="file" accept=".json" ref={restoreInputRef} onChange={handleRestoreBackup} className="hidden" />
-          <button
-            onClick={() => restoreInputRef.current?.click()}
-            disabled={restoring}
-            className="w-full flex items-center justify-center gap-2 bg-red-500 text-white p-2 rounded-md hover:bg-red-600 transition-colors disabled:opacity-50 text-sm"
-          >
-            <Upload className="w-4 h-4" />
-            {restoring ? 'Restauration…' : 'Restaurer depuis une sauvegarde'}
-          </button>
+  const renderJournaux = () => (
+    <div className="space-y-6">
+      {/* ── Bet Logs ── */}
+      <div className="space-y-3">
+        <h4 className="font-semibold text-indigo-600">Historique des paris</h4>
+
+        <div className="flex gap-2 items-center">
+          <input
+            type="date"
+            value={betLogsDate}
+            onChange={e => setBetLogsDate(e.target.value)}
+            className="flex-1 p-2 border rounded-md text-sm bg-white"
+            placeholder="Filtrer par date"
+          />
+          {betLogsDate && (
+            <button
+              onClick={() => setBetLogsDate('')}
+              className="p-2 text-gray-400 hover:text-gray-600 rounded"
+              title="Effacer le filtre"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
         </div>
+
+        {betLogsLoading ? (
+          <p className="text-sm text-gray-400 text-center py-4">Chargement…</p>
+        ) : betLogs.length === 0 ? (
+          <p className="text-sm text-gray-400 text-center py-4">Aucun journal de paris trouvé.</p>
+        ) : (
+          <div className="overflow-x-auto rounded border">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-100 text-left text-xs font-semibold text-gray-600">
+                  <th className="p-2">Date/Heure</th>
+                  <th className="p-2">Joueur</th>
+                  <th className="p-2">Course</th>
+                  <th className="p-2">Action</th>
+                  <th className="p-2">Ancien cheval</th>
+                  <th className="p-2">Nouveau cheval</th>
+                  <th className="p-2">Banquier</th>
+                  <th className="p-2">Par</th>
+                </tr>
+              </thead>
+              <tbody>
+                {betLogs.map((log, i) => (
+                  <tr key={log.id || i} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                    <td className="p-2 whitespace-nowrap text-xs text-gray-500">
+                      {log.timestamp ? new Date(log.timestamp).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }) : '-'}
+                    </td>
+                    <td className="p-2">{log.userName || log.userId || '-'}</td>
+                    <td className="p-2">R{log.raceNumber || '?'}</td>
+                    <td className="p-2">
+                      <span className="inline-block px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-700">
+                        {BET_ACTION_LABELS[log.action] || log.action}
+                      </span>
+                    </td>
+                    <td className="p-2">{log.oldHorseName || (log.oldHorseNumber ? `#${log.oldHorseNumber}` : '-')}</td>
+                    <td className="p-2">{log.newHorseName || (log.newHorseNumber ? `#${log.newHorseNumber}` : '-')}</td>
+                    <td className="p-2 text-center">{log.newIsBanker ? 'Oui' : '-'}</td>
+                    <td className="p-2 whitespace-nowrap">
+                      {log.changedBy ? (
+                        <span className="inline-block px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-700">
+                          {log.changedBy}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-gray-400">joueur</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
+      {/* ── Job Logs ── */}
+      <div className="space-y-3">
+        <h4 className="font-semibold text-indigo-600">Journaux des tâches</h4>
+
+        <select
+          value={jobTypeFilter}
+          onChange={e => setJobTypeFilter(e.target.value)}
+          className="w-full p-2 border rounded-md text-sm bg-white"
+        >
+          <option value="">Toutes les tâches</option>
+          <option value="scrape_races">Import courses</option>
+          <option value="update_odds">Mise à jour côtes</option>
+          <option value="scrape_results">Import résultats</option>
+        </select>
+
+        {jobLogsLoading ? (
+          <p className="text-sm text-gray-400 text-center py-4">Chargement…</p>
+        ) : jobLogs.length === 0 ? (
+          <p className="text-sm text-gray-400 text-center py-4">Aucun journal de tâches trouvé.</p>
+        ) : (
+          <div className="overflow-x-auto rounded border">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-100 text-left text-xs font-semibold text-gray-600">
+                  <th className="p-2">Date/Heure</th>
+                  <th className="p-2">Type</th>
+                  <th className="p-2">Statut</th>
+                  <th className="p-2">Date course</th>
+                  <th className="p-2">Message</th>
+                </tr>
+              </thead>
+              <tbody>
+                {jobLogs.map((log, i) => (
+                  <tr key={log.id || i} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                    <td className="p-2 whitespace-nowrap text-xs text-gray-500">
+                      {log.timestamp ? new Date(log.timestamp).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }) : '-'}
+                    </td>
+                    <td className="p-2">{JOB_TYPE_LABELS[log.jobType] || log.jobType || '-'}</td>
+                    <td className="p-2">
+                      <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${JOB_STATUS_COLORS[log.status] || 'bg-gray-100 text-gray-700'}`}>
+                        {log.status || '-'}
+                      </span>
+                    </td>
+                    <td className="p-2 whitespace-nowrap">{log.raceDate || '-'}</td>
+                    <td className="p-2 text-xs text-gray-600">
+                      {log.message || '-'}
+                      {log.details && (
+                        <details className="mt-1">
+                          <summary className="text-xs text-indigo-500 cursor-pointer">Détails</summary>
+                          <pre className="mt-1 text-xs bg-gray-100 p-2 rounded overflow-x-auto whitespace-pre-wrap">
+                            {typeof log.details === 'string' ? log.details : JSON.stringify(log.details, null, 2)}
+                          </pre>
+                        </details>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  const renderDonnees = () => (
+    <div className="space-y-4">
+      <button onClick={handleDownloadBackup} className="w-full flex items-center justify-center gap-2 bg-indigo-500 text-white p-2 rounded-md hover:bg-indigo-600 transition-colors text-sm">
+        <Download className="w-4 h-4" />
+        Télécharger la sauvegarde
+      </button>
+      <div>
+        <input type="file" accept=".json" ref={restoreInputRef} onChange={handleRestoreBackup} className="hidden" />
+        <button
+          onClick={() => restoreInputRef.current?.click()}
+          disabled={restoring}
+          className="w-full flex items-center justify-center gap-2 bg-red-500 text-white p-2 rounded-md hover:bg-red-600 transition-colors disabled:opacity-50 text-sm"
+        >
+          <Upload className="w-4 h-4" />
+          {restoring ? 'Restauration…' : 'Restaurer depuis une sauvegarde'}
+        </button>
+      </div>
+    </div>
+  );
+
+  const renderActiveTab = () => {
+    switch (activeSubTab) {
+      case 'utilisateurs': return renderUtilisateurs();
+      case 'courses':      return renderCourses();
+      case 'points':       return renderPoints();
+      case 'journaux':     return renderJournaux();
+      case 'donnees':      return renderDonnees();
+      default:             return renderCourses();
+    }
+  };
+
+  return (
+    <div className="bg-white p-6 rounded-b-lg shadow-lg space-y-4">
+
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold flex items-center gap-2 text-indigo-700">
+          <Settings className="w-6 h-6" />
+          Admin
+        </h2>
+        <button
+          onClick={handleAdminLogout}
+          className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors"
+        >
+          <LogOut className="w-4 h-4" />
+          Déconnexion
+        </button>
+      </div>
+
+      {/* Sub-tab bar */}
+      <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-thin">
+        {SUB_TABS.map(({ key, label, icon: Icon }) => (
+          <button
+            key={key}
+            onClick={() => setActiveSubTab(key)}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors flex-shrink-0 ${
+              activeSubTab === key
+                ? 'bg-indigo-600 text-white shadow-sm'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            <Icon className="w-4 h-4" />
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* Active tab content */}
+      <div className="bg-gray-100 p-4 rounded-lg">
+        {renderActiveTab()}
+      </div>
     </div>
   );
 };

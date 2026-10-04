@@ -42,7 +42,7 @@ def create_app():
          allow_headers=["Content-Type", "Authorization"])
 
     # Import models after database is initialized (this registers them with SQLAlchemy)
-    from models import User, Race, Horse, Bet, UserScore
+    from models import User, Race, Horse, Bet, UserScore, BetLog, JobLog
 
     # Import and register route blueprints AFTER database setup
     from routes.users import users_bp
@@ -89,6 +89,7 @@ def apply_migrations(app):
         "ALTER TABLE horses ADD COLUMN IF NOT EXISTS age INTEGER",
         "ALTER TABLE horses ADD COLUMN IF NOT EXISTS form VARCHAR",
         "ALTER TABLE user_scores ADD COLUMN IF NOT EXISTS wins INTEGER DEFAULT 0",
+        "ALTER TABLE bet_logs ADD COLUMN IF NOT EXISTS changed_by VARCHAR",
         # World Cup penalty columns (temporary)
         "ALTER TABLE wc_matches ADD COLUMN IF NOT EXISTS penalty_winner VARCHAR",
         "ALTER TABLE wc_bets ADD COLUMN IF NOT EXISTS predicted_pen_winner VARCHAR",

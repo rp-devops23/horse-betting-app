@@ -14,7 +14,7 @@ from datetime import datetime
 
 # Import database and models directly (no circular import)
 from database import db
-from models import User, Race, Horse, Bet, UserScore, AppSetting
+from models import User, Race, Horse, Bet, UserScore, AppSetting, BetLog, JobLog
 
 DEFAULT_SCORING_CONFIG = {
     "tiers": [
@@ -242,7 +242,8 @@ class DataService:
                         ).first()
                         if existing_horse:
                             existing_horse.name = horse_data['name']
-                            existing_horse.odds = horse_data['odds']
+                            if horse_data['odds'] > 0:
+                                existing_horse.odds = horse_data['odds']
                             existing_horse.stall_number = horse_data.get('stall')
                             existing_horse.jockey = horse_data.get('jockey')
                             existing_horse.trainer = horse_data.get('trainer')
@@ -341,10 +342,11 @@ class DataService:
             
     # --- Betting Management ---
 
-    def place_bet(self, user_id: str, race_id: str, horse_number: int, is_banker: bool, force: bool = False) -> bool:
+    def place_bet(self, user_id: str, race_id: str, horse_number: int, is_banker: bool, force: bool = False, changed_by: str = None) -> bool:
         """Places a bet for a user on a specific horse in a race.
 
         force=True bypasses the completed-race check (admin override only).
+        changed_by: user_id of admin who made the change (None = user themselves).
         """
         try:
             # Check if user and race exist
@@ -375,9 +377,47 @@ class DataService:
             # Check if bet already exists
             existing_bet = Bet.query.filter_by(user_id=user_id, race_id=race_id).first()
             if existing_bet:
+                # Determine action for the log
+                if existing_bet.horse_number != horse_number:
+                    action = 'changed'
+                elif not existing_bet.is_banker and is_banker:
+                    action = 'banker_set'
+                elif existing_bet.is_banker and not is_banker:
+                    action = 'banker_moved'
+                else:
+                    action = 'changed'
+
+                log = BetLog(
+                    id=str(uuid.uuid4()),
+                    user_id=user_id,
+                    race_id=race_id,
+                    action=action,
+                    old_horse_number=existing_bet.horse_number,
+                    new_horse_number=horse_number,
+                    old_is_banker=existing_bet.is_banker,
+                    new_is_banker=is_banker,
+                    changed_by=changed_by,
+                    timestamp=datetime.utcnow()
+                )
+                db.session.add(log)
+
                 existing_bet.horse_number = horse_number
                 existing_bet.is_banker = is_banker
             else:
+                log = BetLog(
+                    id=str(uuid.uuid4()),
+                    user_id=user_id,
+                    race_id=race_id,
+                    action='placed',
+                    old_horse_number=None,
+                    new_horse_number=horse_number,
+                    old_is_banker=None,
+                    new_is_banker=is_banker,
+                    changed_by=changed_by,
+                    timestamp=datetime.utcnow()
+                )
+                db.session.add(log)
+
                 new_bet = Bet(
                     id=str(uuid.uuid4()),
                     user_id=user_id,
@@ -798,6 +838,39 @@ class DataService:
             logger.error(f"Restore failed: {e}")
             db.session.rollback()
             return False
+
+    # --- Job Logging ---
+
+    def log_job(self, job_type: str, status: str, race_date: str = None,
+                message: str = None, details: dict = None, snapshot: dict = None) -> str:
+        """Creates a job log entry. Returns the log id."""
+        import json
+        log_id = str(uuid.uuid4())
+        log = JobLog(
+            id=log_id,
+            job_type=job_type,
+            status=status,
+            race_date=race_date,
+            message=message,
+            details=json.dumps(details) if details else None,
+            snapshot=json.dumps(snapshot) if snapshot else None,
+            timestamp=datetime.utcnow(),
+        )
+        db.session.add(log)
+        db.session.commit()
+        return log_id
+
+    def update_job_log(self, log_id: str, status: str, message: str = None, details: dict = None):
+        """Updates an existing job log entry."""
+        import json
+        log = JobLog.query.get(log_id)
+        if log:
+            log.status = status
+            if message:
+                log.message = message
+            if details:
+                log.details = json.dumps(details)
+            db.session.commit()
 
     # --- Odds Update ---
 
