@@ -60,7 +60,7 @@ const PlayersTab = ({ users, selectedUserId, profileUserId, setProfileUserId, on
         </div>
       )}
 
-      <StatsTab showMessage={showMessage} onOpenProfile={setProfileUserId} />
+      <StatsTab users={users} selectedUserId={selectedUserId} showMessage={showMessage} onOpenProfile={setProfileUserId} />
     </div>
   );
 };

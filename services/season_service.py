@@ -204,8 +204,8 @@ class History:
 
     # --- Per-player numbers ---
 
-    def player_numbers(self, user_id: str) -> Dict[str, Any]:
-        bets = self.bets_of(user_id)
+    def player_numbers(self, user_id: str, period: str = 'all') -> Dict[str, Any]:
+        bets = [b for b in self.bets_of(user_id) if _in_period(self.races[b.race_id].date, period)]
         winning, banker_total, banker_wins = 0, 0, 0
         biggest = None
         for bet in bets:
@@ -221,13 +221,14 @@ class History:
                 banker_total += 1
                 banker_wins += 1 if won else 0
 
-        played = [d for d in self.dates if user_id in self.participants[d]]
+        dates = [d for d in self.dates if _in_period(d, period)]
+        played = [d for d in dates if user_id in self.participants[d]]
         day_points = [(d, self.day_scores[d][user_id]) for d in played]
         best_day = max(day_points, key=lambda dp: dp[1], default=None)
 
         # Longest run of consecutive race days with at least one winning bet
         streak = best_streak = 0
-        for date in self.dates:
+        for date in dates:
             if self.day_wins[date].get(user_id, 0) > 0:
                 streak += 1
                 best_streak = max(best_streak, streak)
@@ -343,6 +344,33 @@ class SeasonService:
             entry['trophyCount'] = sum(t['count'] for t in earned)
             entry['titles'] = sum(1 for w in champions.values() if entry['userId'] in w)
         return {'period': period, 'label': season_label(period), 'standings': entries}
+
+    def get_comparison(self, period: str = 'all') -> Dict[str, Any]:
+        """Per-player numbers for a season, plus cumulative points after each race day."""
+        h = History()
+        standings = [e for e in h.standings(period) if e['daysPlayed']]
+        crowns = h.crowns(period)
+        players = []
+        for entry in standings:
+            n = h.player_numbers(entry['userId'], period)
+            players.append({
+                'userId': entry['userId'], 'name': entry['name'], 'rank': entry['rank'],
+                'score': entry['score'], 'wins': entry['wins'], 'daysPlayed': entry['daysPlayed'],
+                'avgPerDay': entry['avgPerDay'], 'crowns': crowns.get(entry['userId'], 0),
+                'winRate': n['winRate'], 'totalBets': n['totalBets'],
+                'bankerRate': n['bankerRate'], 'bankerWins': n['bankerWins'], 'bankerTotal': n['bankerTotal'],
+                'bestDay': n['bestDay'], 'biggestUpset': n['biggestUpset'], 'bestStreak': n['bestStreak'],
+            })
+        dates = [d for d in h.dates if _in_period(d, period)]
+        series = []
+        for p in players:
+            total, points = 0, []
+            for date in dates:
+                total += h.day_scores[date].get(p['userId'], 0)
+                points.append(total)
+            series.append({'userId': p['userId'], 'name': p['name'], 'points': points})
+        return {'period': period, 'label': season_label(period), 'players': players,
+                'timeline': {'dates': dates, 'series': series}}
 
     def get_seasons(self) -> Dict[str, Any]:
         h = History()

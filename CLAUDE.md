@@ -89,9 +89,9 @@ React 19 SPA with Tailwind CSS, deployed separately (static site).
 
 - `App.js` — root component, holds all shared state (users, races, bets, bankers, selectedRaceDay, selectedUserId), the header/nav, login (player picker + PIN pad) and avatar picker
 - `src/api.js` — `apiFetch` (attaches the auth token) and the localStorage session
-- `src/components/` — one file per tab: `HomePage`, `RaceDayTab`, `LeaderboardTab` (seasons), `PlayersTab` → `PlayerProfile`, `StatsTab` (comparison table), `AdminTab`; shared bits in `ui.jsx`
+- `src/components/` — one file per tab: `HomePage`, `RaceDayTab`, `LeaderboardTab` (seasons), `PlayersTab` → `PlayerProfile`, `StatsTab` (charts: points race + ranked bars per metric, from `/api/race-days/compare`), `AdminTab`; shared bits in `ui.jsx`
 - Playful design system: colours `grape`/`sunny`/`coral`/`mint`/`sky2`, fonts Baloo 2 + Nunito, and component classes (`card`, `btn-primary`, `chip`, `input`, …) in `tailwind.config.js` and `src/index.css`
-- `src/utils/` — `time.js` (countdowns, client-side race locks), `scoring.js`, `celebrate.js` (confetti), `userColors.js` (badge colours, avatar emojis)
+- `src/utils/` — `time.js` (countdowns, client-side race locks), `scoring.js`, `celebrate.js` (confetti), `userColors.js` (avatar emojis; player colours = a colourblind-validated chart palette in fixed order, shared by avatars and chart lines)
 - API base URL switches automatically: `localhost:5000` in development, `horse-betting-backend.onrender.com` in production
 
 ## Environment variables

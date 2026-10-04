@@ -69,11 +69,17 @@ def get_player_profile(user_id):
         return jsonify({"success": False, "error": "Player not found"}), 404
     return jsonify({"success": True, **profile})
 
-@race_days_bp.route('/stats', methods=['GET'])
-def get_all_stats():
-    """Get all-time stats for all players."""
-    stats = data_service.get_all_stats()
-    return jsonify({"success": True, "stats": stats})
+@race_days_bp.route('/compare', methods=['GET'])
+def get_comparison():
+    """Players compared over a season (?period=all | YYYY): numbers + points race."""
+    period = request.args.get('period', 'all')
+    if period != 'all' and not re.fullmatch(r'\d{4}', period):
+        return jsonify({"success": False, "error": "Invalid period"}), 400
+    try:
+        return jsonify({"success": True, **season_service.get_comparison(period)})
+    except Exception as e:
+        logger.exception("comparison failed")
+        return jsonify({"success": False, "error": f"Erreur des statistiques : {e}"}), 500
 
 @race_days_bp.route('/leaderboard/current', methods=['GET'])
 def get_current_leaderboard():
