@@ -5,7 +5,7 @@ User-related routes with proper imports.
 
 from flask import Blueprint, jsonify, request
 from services import data_service
-from auth import (issue_token, current_auth, require_admin,
+from auth import (issue_token, current_auth, current_user_id, require_admin, require_user,
                   is_locked_out, record_failed_attempt, clear_failed_attempts)
 
 users_bp = Blueprint('users', __name__)
@@ -59,6 +59,18 @@ def get_me():
         "is_admin": auth['is_admin'],
     })
     
+AVATARS = {'🐴', '🦄', '🏇', '🐎', '🦓', '🐢', '🦊', '🐯', '🦁', '🐼', '🐸', '🐙', '🦖', '🐝', '🦜', '🐬', '👑', '🍀', '🌟', '🔥', '🎩', '🌈', '🍍', '🥥'}
+
+@users_bp.route('/users/me', methods=['PUT'])
+@require_user
+def update_me():
+    """Lets a player change their avatar emoji."""
+    avatar = (request.get_json(silent=True) or {}).get('avatar')
+    if avatar is not None and avatar not in AVATARS:
+        return jsonify({"success": False, "error": "Avatar inconnu"}), 400
+    data_service.set_user_avatar(current_user_id(), avatar)
+    return jsonify({"success": True, "avatar": avatar})
+
 @users_bp.route('/users/<user_id>', methods=['DELETE'])
 @require_admin
 def delete_user(user_id):

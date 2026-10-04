@@ -184,7 +184,7 @@ def admin_place_bet():
     user_id = data.get('userId')
     race_id = data.get('raceId')
     horse_number = data.get('horseNumber')
-    is_banker = bool(data.get('isBanker', False))
+    is_banker = bool(data['isBanker']) if 'isBanker' in data else None  # None keeps the current flag
     admin_id = current_user_id() or 'admin'
     if not all([user_id, race_id, horse_number]):
         return jsonify({"error": "userId, raceId and horseNumber are required"}), 400

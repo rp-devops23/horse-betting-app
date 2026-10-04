@@ -31,7 +31,9 @@ DEFAULT_SCORING_CONFIG = {
 
 # Races run in Mauritius; race times are local (UTC+4)
 MAURITIUS_TZ = timezone(timedelta(hours=4))
-PIN_HASH_METHOD = 'pbkdf2:sha256'
+# A 4-digit PIN has only 10k values, so a huge iteration count adds little but
+# makes logins slow on Render's free tier; login throttling is the main defence.
+PIN_HASH_METHOD = 'pbkdf2:sha256:60000'
 
 def _is_plain_pin(pin: str) -> bool:
     return bool(pin) and re.fullmatch(r'\d{4}', pin) is not None
@@ -58,7 +60,15 @@ class DataService:
     def get_all_users(self) -> List[Dict[str, Any]]:
         """Get all users from the database."""
         users = User.query.all()
-        return [{"id": user.id, "name": user.name, "is_admin": bool(user.is_admin)} for user in users]
+        return [{"id": user.id, "name": user.name, "is_admin": bool(user.is_admin), "avatar": user.avatar} for user in users]
+
+    def set_user_avatar(self, user_id: str, avatar: str) -> bool:
+        user = User.query.get(user_id)
+        if not user:
+            return False
+        user.avatar = avatar or None
+        db.session.commit()
+        return True
 
     def add_user(self, name: str, pin: str = None) -> Dict[str, Any]:
         """Add a new user to the database."""
@@ -884,7 +894,7 @@ class DataService:
         return {
             "exported_at": datetime.utcnow().isoformat() + "Z",
             "version": "1",
-            "users":  [{"id": u.id, "name": u.name, "pin": u.pin}
+            "users":  [{"id": u.id, "name": u.name, "pin": u.pin, "avatar": u.avatar}
                        for u in User.query.all()],
             "races":  [{"id": r.id, "date": r.date, "race_number": r.race_number,
                         "status": r.status, "winner_horse_number": r.winner_horse_number}
@@ -913,7 +923,7 @@ class DataService:
             db.session.flush()
 
             for u in backup.get("users", []):
-                db.session.add(User(id=u["id"], name=u["name"], pin=u.get("pin")))
+                db.session.add(User(id=u["id"], name=u["name"], pin=u.get("pin"), avatar=u.get("avatar")))
             for r in backup.get("races", []):
                 db.session.add(Race(id=r["id"], date=r["date"],
                                     race_number=r["race_number"], status=r["status"],

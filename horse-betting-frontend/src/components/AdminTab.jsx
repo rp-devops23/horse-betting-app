@@ -695,17 +695,17 @@ const AdminTab = ({
   };
 
   return (
-    <div className="bg-white p-6 rounded-b-lg shadow-lg space-y-4">
+    <div className="space-y-4">
 
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold flex items-center gap-2 text-indigo-700">
-          <Settings className="w-6 h-6" />
+        <h2 className="section-title">
+          <Settings className="w-7 h-7 text-grape-500" />
           Admin
         </h2>
         <button
           onClick={handleAdminLogout}
-          className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors"
+          className="btn-coral py-2 text-sm"
         >
           <LogOut className="w-4 h-4" />
           Déconnexion
@@ -718,10 +718,10 @@ const AdminTab = ({
           <button
             key={key}
             onClick={() => setActiveSubTab(key)}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors flex-shrink-0 ${
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-display font-bold whitespace-nowrap transition-colors flex-shrink-0 border-2 ${
               activeSubTab === key
-                ? 'bg-indigo-600 text-white shadow-sm'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                ? 'bg-grape-500 border-grape-500 text-white'
+                : 'bg-white border-grape-100 text-grape-500 hover:border-grape-300'
             }`}
           >
             <Icon className="w-4 h-4" />
@@ -731,7 +731,7 @@ const AdminTab = ({
       </div>
 
       {/* Active tab content */}
-      <div className="bg-gray-100 p-4 rounded-lg">
+      <div className="card p-4">
         {renderActiveTab()}
       </div>
     </div>

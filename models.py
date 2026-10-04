@@ -12,6 +12,7 @@ class User(db.Model):
     name = db.Column(db.String, nullable=False)
     pin = db.Column(db.String(255), nullable=True)  # werkzeug hash
     is_admin = db.Column(db.Boolean, default=False)
+    avatar = db.Column(db.String, nullable=True)  # emoji picked by the player
 
     # Relationships
     bets = db.relationship('Bet', backref='user', lazy=True, cascade='all, delete-orphan')

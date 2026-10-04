@@ -38,8 +38,9 @@ database.py            # Creates shared SQLAlchemy db instance
 auth.py                # Signed bearer tokens, require_user / require_admin / require_admin_or_job decorators
 models.py              # User, Race, Horse, Bet, UserScore, AppSetting, BetLog, JobLog
 services/
-  __init__.py          # Instantiates and exports shared data_service singleton
-  data_service.py      # All DB operations — the only place that touches the DB
+  __init__.py          # Instantiates and exports the data_service and season_service singletons
+  data_service.py      # Core DB operations (users, races, bets, scoring, locks/visibility)
+  season_service.py    # Read-only: standings per period, monthly seasons, player profiles, achievements
 routes/
   users.py             # /api/users
   races.py             # /api/races — includes scraping and result entry
@@ -72,6 +73,10 @@ Scheduled GitHub Actions (`.github/workflows/`) call the scrape/odds/results end
 - Bets lock server-side when a race starts (race time is Mauritius local, UTC+4) or has a result. Bankers lock for the whole day once the first race starts. Admins can override via `/api/admin/bet` and `/api/admin/banker`.
 - **Other players' bets are hidden until the race locks**; bankers are hidden until the first race of the day starts. `DataService.get_visible_bets` / `get_visible_bankers` / `get_race_day_data(viewer_id)` enforce this — never return raw bets from a public endpoint.
 
+## Seasons & trophies
+
+Each calendar month (Mauritius time) is a season; the top scorer when the month ends is its champion. Achievements (badges) are computed on the fly in `season_service.ACHIEVEMENTS` — nothing is stored.
+
 ## Scoring rules
 
 Points per winning bet come from the configurable tiers stored in `AppSetting('scoring_config')` (default: odds ≥ 20 → 5, ≥ 10 → 3, ≥ 5 → 2, otherwise 1). An optional `last_place_penalty` applies when the picked horse finishes last.
@@ -82,8 +87,11 @@ If the user's banker bet wins, their entire day's score is doubled.
 
 React 19 SPA with Tailwind CSS, deployed separately (static site).
 
-- `App.js` — root component, holds all shared state (users, races, bets, bankers, selectedRaceDay, selectedUserId), passes everything down as props
-- `src/components/` — one file per tab: `RaceDayTab`, `UserBetsTab`, `LeaderboardTab`, `AdminTab`, `HomePage`
+- `App.js` — root component, holds all shared state (users, races, bets, bankers, selectedRaceDay, selectedUserId), the header/nav, login (player picker + PIN pad) and avatar picker
+- `src/api.js` — `apiFetch` (attaches the auth token) and the localStorage session
+- `src/components/` — one file per tab: `HomePage`, `RaceDayTab`, `LeaderboardTab` (seasons), `PlayersTab` → `PlayerProfile`, `StatsTab` (comparison table), `AdminTab`; shared bits in `ui.jsx`
+- Playful design system: colours `grape`/`sunny`/`coral`/`mint`/`sky2`, fonts Baloo 2 + Nunito, and component classes (`card`, `btn-primary`, `chip`, `input`, …) in `tailwind.config.js` and `src/index.css`
+- `src/utils/` — `time.js` (countdowns, client-side race locks), `scoring.js`, `celebrate.js` (confetti), `userColors.js` (badge colours, avatar emojis)
 - API base URL switches automatically: `localhost:5000` in development, `horse-betting-backend.onrender.com` in production
 
 ## Environment variables

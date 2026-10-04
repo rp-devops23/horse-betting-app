@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { BarChart3 } from 'lucide-react';
 
 import { apiFetch } from '../api';
 
@@ -14,7 +13,7 @@ const COLUMNS = [
   { key: 'daysPlayed',   label: 'Jours joués',     format: v => v != null ? `${v}` : '-' },
 ];
 
-const StatsTab = ({ showMessage }) => {
+const StatsTab = ({ showMessage, onOpenProfile }) => {
   const [stats, setStats] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -48,10 +47,9 @@ const StatsTab = ({ showMessage }) => {
 
   if (loading) {
     return (
-      <div className="bg-white p-6 rounded-lg shadow-md animate-pulse space-y-4">
-        <div className="h-6 bg-gray-200 rounded w-1/3 mb-4" />
+      <div className="card p-6 animate-pulse space-y-3">
         {[...Array(4)].map((_, i) => (
-          <div key={i} className="h-10 bg-gray-200 rounded w-full" />
+          <div key={i} className="h-8 bg-grape-50 rounded-xl w-full" />
         ))}
       </div>
     );
@@ -59,33 +57,30 @@ const StatsTab = ({ showMessage }) => {
 
   if (stats.length === 0) {
     return (
-      <div className="bg-white p-6 rounded-lg shadow-md text-center text-gray-500 italic">
-        Pas encore de statistiques — les stats apparaitront après la première journée de courses.
+      <div className="card p-6 text-center text-grape-400 font-bold">
+        Pas encore de statistiques — elles apparaîtront après la première journée de courses.
       </div>
     );
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-md">
-      <h2 className="text-2xl font-bold flex items-center gap-2 text-indigo-700 p-6 pb-2">
-        <BarChart3 className="w-6 h-6" />
-        Statistiques
-      </h2>
+    <div className="card overflow-hidden">
+      <h3 className="font-display text-xl font-extrabold text-grape-800 px-5 pt-5">📊 Tableau comparatif</h3>
 
       {/* Scroll hint */}
-      <p className="text-xs text-gray-400 px-6 mb-2">Glisser pour voir toutes les stats →</p>
+      <p className="text-xs font-bold text-grape-300 px-5 mb-2">Glisse pour voir toutes les stats →</p>
 
       {/* Scrollable wrapper with right fade */}
       <div className="relative">
         <div className="overflow-x-auto pb-4" style={{ WebkitOverflowScrolling: 'touch' }}>
           <table className="w-max min-w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-200">
-                <th className="sticky left-0 z-10 bg-white px-4 py-3 text-left font-semibold text-gray-600 min-w-[130px]">
+              <tr className="border-b-2 border-grape-100">
+                <th className="sticky left-0 z-10 bg-white px-4 py-3 text-left font-display font-bold text-grape-500 min-w-[130px]">
                   Joueur
                 </th>
                 {COLUMNS.map(col => (
-                  <th key={col.key} className="px-4 py-3 text-center font-semibold text-gray-600 min-w-[110px] whitespace-nowrap">
+                  <th key={col.key} className="px-4 py-3 text-center font-display font-bold text-grape-500 min-w-[110px] whitespace-nowrap">
                     {col.label}
                   </th>
                 ))}
@@ -95,17 +90,18 @@ const StatsTab = ({ showMessage }) => {
               {stats.map((player, idx) => (
                 <tr
                   key={player.userId}
-                  className="border-b border-gray-100 group"
+                  className="border-b border-grape-50 group cursor-pointer"
+                  onClick={() => onOpenProfile?.(player.userId)}
                 >
-                  <td className={`sticky left-0 z-10 px-4 py-3 font-semibold text-gray-800 min-w-[130px] ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} group-hover:bg-indigo-50`}>
+                  <td className={`sticky left-0 z-10 px-4 py-3 font-bold text-grape-800 min-w-[130px] ${idx % 2 === 0 ? 'bg-white' : 'bg-grape-50'} group-hover:bg-grape-100`}>
                     {player.name}
                   </td>
                   {COLUMNS.map(col => {
                     const val = player[col.key];
                     const isBest = val != null && val > 0 && val === bests[col.key];
                     return (
-                      <td key={col.key} className={`px-4 py-3 text-center whitespace-nowrap ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} group-hover:bg-indigo-50 ${isBest ? 'text-indigo-700 font-bold' : 'text-gray-700'}`}>
-                        {col.format(val, player)}
+                      <td key={col.key} className={`px-4 py-3 text-center whitespace-nowrap ${idx % 2 === 0 ? 'bg-white' : 'bg-grape-50'} group-hover:bg-grape-100 ${isBest ? 'text-grape-700 font-extrabold' : 'text-grape-600'}`}>
+                        {isBest && '⭐ '}{col.format(val, player)}
                       </td>
                     );
                   })}

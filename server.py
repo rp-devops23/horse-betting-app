@@ -90,6 +90,7 @@ def apply_migrations(app):
         "ALTER TABLE horses ADD COLUMN IF NOT EXISTS form VARCHAR",
         "ALTER TABLE user_scores ADD COLUMN IF NOT EXISTS wins INTEGER DEFAULT 0",
         "ALTER TABLE bet_logs ADD COLUMN IF NOT EXISTS changed_by VARCHAR",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar VARCHAR",
         # PINs are now stored hashed
         "ALTER TABLE users ALTER COLUMN pin TYPE VARCHAR(255)",
         # World Cup penalty columns (temporary)

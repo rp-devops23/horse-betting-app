@@ -1,175 +1,173 @@
 import React, { useState, useEffect } from 'react';
-import { Trophy, Shield, Users, Info, Award, Target, Heart } from 'lucide-react';
+import { ArrowRight, ChevronDown } from 'lucide-react';
 import { apiFetch } from '../api';
+import { Avatar, ProgressBar } from './ui.jsx';
+import { useNow, isRaceLocked, raceStart, formatCountdown, relativeDay } from '../utils/time';
 
-const TIER_COLOURS = [
-  'bg-purple-100 text-purple-800',
-  'bg-blue-100 text-blue-800',
-  'bg-green-100 text-green-800',
-  'bg-teal-100 text-teal-800',
-  'bg-gray-100 text-gray-600',
+const STEPS = [
+  { emoji: '🙋', title: 'Choisis ton profil', text: 'Touche « Je joue ! » en haut et entre ton code secret.', colour: 'bg-grape-100' },
+  { emoji: '🐎', title: 'Un cheval par course', text: 'Touche un cheval pour parier. Tu peux changer d’avis jusqu’au départ.', colour: 'bg-sky2-100' },
+  { emoji: '🤫', title: 'Paris secrets', text: 'Les choix des autres restent cachés jusqu’au départ de chaque course. Pas de copiage !', colour: 'bg-mint-100' },
+  { emoji: '⭐', title: 'Ton banker', text: 'Une course par journée : si ton cheval gagne, ton total du jour est doublé !', colour: 'bg-sunny-100' },
+  { emoji: '🏆', title: 'Deviens champion', text: 'Chaque mois est une saison : le premier à la fin du mois remporte le trophée.', colour: 'bg-coral-100' },
 ];
 
-const HomePage = () => {
-  const [scoringConfig, setScoringConfig] = useState(null);
+const TIER_COLOURS = ['bg-coral-100 text-coral-600', 'bg-sunny-100 text-sunny-600', 'bg-grape-100 text-grape-600', 'bg-mint-100 text-mint-600', 'bg-sky2-100 text-sky2-500'];
+
+const HomePage = ({ me, users, races, bets, bankers, selectedRaceDay, scoringConfig, onLogin, onGoToRaces, onOpenProfile, onGoToLeaderboard }) => {
+  const [season, setSeason] = useState(null);
+  const now = useNow(30000);
 
   useEffect(() => {
-    apiFetch(`/admin/settings`)
-      .then(r => r.ok ? r.json() : null)
-      .then(data => { if (data) setScoringConfig(data); })
+    apiFetch(`/race-days/seasons`)
+      .then(r => (r.ok ? r.json() : null))
+      .then(data => data?.success && setSeason(data.months.find(m => m.isCurrent) || null))
       .catch(() => {});
   }, []);
 
-  const sortedTiers = scoringConfig
-    ? [...scoringConfig.tiers].sort((a, b) => b.min_odds - a.min_odds)
-    : null;
+  const sortedTiers = scoringConfig ? [...scoringConfig.tiers].sort((a, b) => b.min_odds - a.min_odds) : null;
+  const sortedRaces = [...races].sort((a, b) => a.raceNumber - b.raceNumber);
+  const openRaces = sortedRaces.filter(r => !isRaceLocked(r, now));
+  const nextRace = openRaces[0];
+  const myBets = me ? sortedRaces.filter(r => bets.some(b => b.userId === me.id && b.raceId === r.id)).length : 0;
+  const myBanker = me ? bankers?.[me.id] : null;
+  const dayOver = sortedRaces.length > 0 && sortedRaces.every(r => r.winner != null);
+  const leader = season?.leader;
+  const leaderUser = leader && (users.find(u => u.id === leader.userId) || { id: leader.userId, name: leader.name });
 
   return (
-    <div className="bg-white p-6 rounded-b-lg shadow-lg">
-      <div className="space-y-6 max-w-2xl mx-auto">
+    <div className="space-y-5">
 
-        {/* Welcome Header */}
-        <div className="text-center">
-          <h1 className="text-4xl font-bold text-indigo-700 mb-4 flex items-center justify-center gap-3">
-            <Trophy className="w-10 h-10" />
-            Bienvenue sur Lekours
-          </h1>
-          <p className="text-xl text-gray-600 mb-2">
-            Le jeu de paris hippiques de la famille Payen
-          </p>
-          <p className="text-gray-500">
-            Prépare ton tuyo, fais confiance à ton instinct, affronte les meilleurs zougaders et grimpe en tête du classement !
-          </p>
+      {/* Hero */}
+      <div className="card relative overflow-hidden p-6 sm:p-8 bg-gradient-to-br from-grape-500 via-grape-500 to-coral-400 border-grape-600 text-white">
+        <div className="absolute -right-6 -bottom-8 text-[9rem] opacity-20 rotate-[-8deg] select-none pointer-events-none">🏇</div>
+        <p className="font-display text-sm font-bold uppercase tracking-widest text-grape-100">Lekours · famille Payen</p>
+        <h1 className="mt-1 font-display text-4xl sm:text-5xl font-extrabold leading-tight">
+          {me ? <>Salut {me.name}&nbsp;! 👋</> : <>Prêts pour la course&nbsp;? 🏁</>}
+        </h1>
+        <p className="mt-2 max-w-md text-grape-50 font-semibold">
+          Prépare ton tuyo, fais confiance à ton instinct, affronte les meilleurs zougaders et grimpe en tête du classement&nbsp;!
+        </p>
+        <div className="mt-5 flex flex-wrap gap-3">
+          {me ? (
+            <button onClick={onGoToRaces} className="btn-sunny">Parier maintenant <ArrowRight className="w-5 h-5" /></button>
+          ) : (
+            <button onClick={onLogin} className="btn-sunny">Je joue ! <ArrowRight className="w-5 h-5" /></button>
+          )}
+          {me && <button onClick={() => onOpenProfile(me.id)} className="btn bg-white/20 text-white hover:bg-white/30">Mon profil</button>}
         </div>
-
-        {/* How to Play */}
-        <div className="bg-blue-50 p-6 rounded-lg border border-blue-200">
-          <h2 className="text-2xl font-bold text-indigo-700 mb-4 flex items-center gap-2">
-            <Target className="w-6 h-6" />
-            Comment jouer
-          </h2>
-          <div className="space-y-4 text-gray-700">
-            <div className="flex items-start gap-3">
-              <div className="bg-indigo-100 rounded-full p-2 mt-1 flex-shrink-0">
-                <span className="text-indigo-600 font-bold text-sm">1</span>
-              </div>
-              <div>
-                <h3 className="font-semibold">Choisir un joueur & une journée</h3>
-                <p className="text-sm">Sélectionne ton profil en haut de la page, puis choisis une journée de courses.</p>
-              </div>
-            </div>
-            <div className="flex items-start gap-3">
-              <div className="bg-indigo-100 rounded-full p-2 mt-1 flex-shrink-0">
-                <span className="text-indigo-600 font-bold text-sm">2</span>
-              </div>
-              <div>
-                <h3 className="font-semibold">Parier sur un cheval</h3>
-                <p className="text-sm">Clique sur un cheval pour placer ton pari. Tu peux changer jusqu'à la dernière minute.</p>
-              </div>
-            </div>
-            <div className="flex items-start gap-3">
-              <div className="bg-indigo-100 rounded-full p-2 mt-1 flex-shrink-0">
-                <span className="text-indigo-600 font-bold text-sm">3</span>
-              </div>
-              <div>
-                <h3 className="font-semibold">Désigner un Banker</h3>
-                <p className="text-sm">Choisis une course comme "banker" ⭐. Si ce cheval gagne, ton total de la journée est multiplié par 2 !</p>
-              </div>
-            </div>
-            <div className="flex items-start gap-3">
-              <div className="bg-indigo-100 rounded-full p-2 mt-1 flex-shrink-0">
-                <span className="text-indigo-600 font-bold text-sm">4</span>
-              </div>
-              <div>
-                <h3 className="font-semibold">Suivre les résultats</h3>
-                <p className="text-sm">Les scores se mettent à jour au fur et à mesure des résultats. Vois qui mène la danse !</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Scoring System */}
-        <div className="bg-green-50 p-6 rounded-lg border border-green-200">
-          <h2 className="text-2xl font-bold text-green-700 mb-4 flex items-center gap-2">
-            <Award className="w-6 h-6" />
-            Système de points
-          </h2>
-          <div className="space-y-3 text-gray-700">
-            {sortedTiers ? (
-              <>
-                {sortedTiers.map((tier, i) => {
-                  const label = i === 0
-                    ? `Pari gagnant (cote ${tier.min_odds}+)`
-                    : `Pari gagnant (cote ${tier.min_odds > 0 ? tier.min_odds : 1}–${sortedTiers[i - 1].min_odds})`;
-                  const colour = TIER_COLOURS[i % TIER_COLOURS.length];
-                  return (
-                    <div key={i} className="flex items-center justify-between">
-                      <span className="font-medium">{label}</span>
-                      <span className={`${colour} px-3 py-1 rounded-full text-sm font-semibold`}>+{tier.points} pt{tier.points > 1 ? 's' : ''}</span>
-                    </div>
-                  );
-                })}
-                <div className="flex items-center justify-between">
-                  <span className="font-medium">Pari perdant</span>
-                  <span className="bg-gray-100 text-gray-600 px-3 py-1 rounded-full text-sm font-semibold">0 pt</span>
-                </div>
-                {scoringConfig.last_place_penalty !== 0 && (
-                  <div className="flex items-center justify-between">
-                    <span className="font-medium">Cheval arrivé dernier</span>
-                    <span className="bg-red-100 text-red-700 px-3 py-1 rounded-full text-sm font-semibold">{scoringConfig.last_place_penalty} pt</span>
-                  </div>
-                )}
-              </>
-            ) : (
-              <p className="text-sm text-gray-400 italic">Chargement…</p>
-            )}
-          </div>
-          <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-            <p className="text-sm text-gray-700">
-              <strong>Total journée :</strong> somme de tous tes points sur la journée
-            </p>
-            <p className="text-sm text-gray-700 mt-1">
-              <strong>Bonus Banker :</strong> si ton banker gagne, ton total est multiplié par 2 !
-            </p>
-          </div>
-        </div>
-
-        {/* Fair Play */}
-        <div className="bg-purple-50 p-6 rounded-lg border border-purple-200">
-          <h2 className="text-2xl font-bold text-purple-700 mb-4 flex items-center gap-2">
-            <Shield className="w-6 h-6" />
-            Fair-play
-          </h2>
-          <div className="space-y-3 text-gray-700">
-            <div className="flex items-start gap-3">
-              <Heart className="w-5 h-5 text-purple-600 mt-1 flex-shrink-0" />
-              <p className="text-sm"><strong>Pas d'argent :</strong> jeu 100 % récréatif, aucun enjeu financier.</p>
-            </div>
-            <div className="flex items-start gap-3">
-              <Users className="w-5 h-5 text-purple-600 mt-1 flex-shrink-0" />
-              <p className="text-sm"><strong>Compétition amicale :</strong> joue fairement et respecte les autres joueurs.</p>
-            </div>
-            <div className="flex items-start gap-3">
-              <Trophy className="w-5 h-5 text-purple-600 mt-1 flex-shrink-0" />
-              <p className="text-sm"><strong>Fair-play :</strong> félicite les vainqueurs et tire des leçons de tes pronostics.</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Privacy */}
-        <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
-          <h2 className="text-2xl font-bold text-gray-700 mb-4 flex items-center gap-2">
-            <Info className="w-6 h-6" />
-            Données & confidentialité
-          </h2>
-          <div className="space-y-2 text-gray-600 text-sm">
-            <p><strong>Données stockées :</strong> uniquement ton prénom et tes paris. Aucune donnée personnelle sensible.</p>
-            <p><strong>Usage :</strong> uniquement pour ton profil de jeu et le calcul des scores.</p>
-            <p><strong>Tes droits :</strong> tu peux demander à voir, modifier ou supprimer tes données à tout moment.</p>
-          </div>
-        </div>
-
       </div>
+
+      <div className="grid sm:grid-cols-2 gap-5">
+        {/* Race day */}
+        {selectedRaceDay && sortedRaces.length > 0 && (
+          <button onClick={onGoToRaces} className="card p-5 text-left hover:-translate-y-0.5 transition-transform">
+            <p className="text-xs font-bold uppercase tracking-wide text-grape-400">Journée de courses</p>
+            <p className="font-display text-2xl font-extrabold text-grape-900">{relativeDay(selectedRaceDay)} · {sortedRaces.length} courses</p>
+            {dayOver ? (
+              <p className="mt-2 font-bold text-grape-500">🏁 Journée terminée — viens voir les résultats !</p>
+            ) : nextRace && raceStart(nextRace) ? (
+              <p className="mt-2 font-bold text-coral-500">⏱ Prochain départ dans {formatCountdown(raceStart(nextRace) - now)} (course {nextRace.raceNumber})</p>
+            ) : (
+              <p className="mt-2 font-bold text-sky2-500">🏁 Les courses sont en cours !</p>
+            )}
+            {me && !dayOver && (
+              <div className="mt-3">
+                <div className="flex justify-between text-sm font-bold text-grape-600 mb-1">
+                  <span>Tes paris</span><span>{myBets}/{sortedRaces.length}</span>
+                </div>
+                <ProgressBar value={myBets} max={sortedRaces.length} className="bg-gradient-to-r from-grape-400 to-coral-400" />
+                <p className={`mt-2 text-sm font-bold ${myBanker ? 'text-sunny-600' : 'text-grape-400'}`}>
+                  {myBanker ? '⭐ Banker posé' : '⭐ Pas encore de banker'}
+                </p>
+              </div>
+            )}
+          </button>
+        )}
+
+        {/* Season */}
+        {season && (
+          <button onClick={onGoToLeaderboard} className="card p-5 text-left hover:-translate-y-0.5 transition-transform bg-gradient-to-br from-sunny-100 to-white">
+            <p className="text-xs font-bold uppercase tracking-wide text-sunny-600">Saison en cours</p>
+            <p className="font-display text-2xl font-extrabold text-grape-900">🏆 {season.label}</p>
+            {leader ? (
+              <div className="mt-3 flex items-center gap-3">
+                <Avatar user={leaderUser} users={users} size="lg" />
+                <div>
+                  <p className="font-display text-lg font-extrabold text-grape-800">{leader.name} mène la danse</p>
+                  <p className="text-sm font-bold text-grape-500">{leader.score} pts en {leader.daysPlayed} journée{leader.daysPlayed > 1 ? 's' : ''}</p>
+                </div>
+              </div>
+            ) : (
+              <p className="mt-2 font-bold text-grape-500">Personne n'a encore marqué ce mois-ci — le trophée est à prendre !</p>
+            )}
+          </button>
+        )}
+      </div>
+
+      {/* How to play */}
+      <div className="card p-5 sm:p-6">
+        <h2 className="section-title mb-4">🎮 Comment jouer</h2>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {STEPS.map((step, i) => (
+            <div key={step.title} className={`rounded-2xl p-4 ${step.colour}`}>
+              <div className="flex items-center gap-2">
+                <span className="text-3xl">{step.emoji}</span>
+                <span className="font-display text-xs font-extrabold text-grape-400">ÉTAPE {i + 1}</span>
+              </div>
+              <p className="mt-1 font-display text-lg font-extrabold text-grape-900">{step.title}</p>
+              <p className="text-sm text-grape-600">{step.text}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Scoring */}
+      <div className="card p-5 sm:p-6">
+        <h2 className="section-title mb-1">🎯 Les points</h2>
+        <p className="text-grape-500 mb-4">Plus le cheval est un outsider, plus il rapporte !</p>
+        {sortedTiers ? (
+          <div className="space-y-2">
+            {sortedTiers.map((tier, i) => {
+              const label = i === 0
+                ? `Cote ${tier.min_odds} et plus`
+                : `Cote ${tier.min_odds > 0 ? tier.min_odds : 1} à ${sortedTiers[i - 1].min_odds}`;
+              return (
+                <div key={i} className="flex items-center justify-between rounded-2xl bg-grape-50 px-4 py-2.5">
+                  <span className="font-bold text-grape-700">{label}</span>
+                  <span className={`chip text-sm ${TIER_COLOURS[i % TIER_COLOURS.length]}`}>+{tier.points} pt{tier.points > 1 ? 's' : ''}</span>
+                </div>
+              );
+            })}
+            {scoringConfig.last_place_penalty !== 0 && (
+              <div className="flex items-center justify-between rounded-2xl bg-coral-100 px-4 py-2.5">
+                <span className="font-bold text-grape-700">🐢 Ton cheval arrive dernier</span>
+                <span className="chip text-sm bg-white text-coral-600">{scoringConfig.last_place_penalty} pt</span>
+              </div>
+            )}
+            <div className="flex items-center justify-between rounded-2xl bg-sunny-100 px-4 py-2.5">
+              <span className="font-bold text-grape-700">⭐ Ton banker gagne</span>
+              <span className="chip text-sm bg-white text-sunny-600">journée ×2</span>
+            </div>
+          </div>
+        ) : (
+          <p className="text-sm text-grape-300">Chargement…</p>
+        )}
+      </div>
+
+      {/* Fair play & privacy */}
+      <details className="card p-5 group">
+        <summary className="flex items-center justify-between cursor-pointer list-none font-display text-lg font-extrabold text-grape-800">
+          🤝 Fair-play & données
+          <ChevronDown className="w-5 h-5 text-grape-300 group-open:rotate-180 transition-transform" />
+        </summary>
+        <div className="mt-3 space-y-2 text-sm text-grape-600">
+          <p><strong>Pas d'argent :</strong> jeu 100 % récréatif, aucun enjeu financier.</p>
+          <p><strong>Compétition amicale :</strong> on félicite les vainqueurs et on chambre gentiment les perdants.</p>
+          <p><strong>Données :</strong> uniquement ton prénom, ton avatar et tes paris, pour calculer les scores. Ton code secret est chiffré.</p>
+          <p><strong>Tes droits :</strong> tu peux demander à voir, modifier ou supprimer tes données à tout moment.</p>
+        </div>
+      </details>
     </div>
   );
 };

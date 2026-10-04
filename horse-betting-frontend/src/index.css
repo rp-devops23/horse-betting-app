@@ -2,16 +2,51 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+@layer base {
+  html { -webkit-tap-highlight-color: transparent; }
+  body {
+    @apply bg-cream font-sans text-grape-900 antialiased;
+    background-image:
+      radial-gradient(circle at 12% 8%, rgba(255, 213, 74, 0.18) 0, transparent 28%),
+      radial-gradient(circle at 88% 14%, rgba(130, 71, 245, 0.12) 0, transparent 30%),
+      radial-gradient(circle at 50% 100%, rgba(51, 201, 143, 0.10) 0, transparent 40%);
+    background-attachment: fixed;
+  }
+  h1, h2, h3, h4 { @apply font-display; }
 }
 
-code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+@layer components {
+  .card {
+    @apply bg-white rounded-3xl border-2 border-grape-100 shadow-chunky;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-2.5 font-display font-bold
+           transition-all duration-150 select-none
+           active:translate-y-[3px] active:shadow-none disabled:opacity-50 disabled:pointer-events-none;
+  }
+  .btn-primary { @apply btn bg-grape-500 text-white shadow-[0_4px_0_0_theme(colors.grape.700)] hover:bg-grape-600; }
+  .btn-sunny   { @apply btn bg-sunny-300 text-grape-900 shadow-[0_4px_0_0_theme(colors.sunny.600)] hover:bg-sunny-400; }
+  .btn-mint    { @apply btn bg-mint-400 text-white shadow-[0_4px_0_0_theme(colors.mint.600)] hover:bg-mint-500; }
+  .btn-coral   { @apply btn bg-coral-400 text-white shadow-[0_4px_0_0_theme(colors.coral.600)] hover:bg-coral-500; }
+  .btn-ghost   { @apply btn bg-grape-50 text-grape-700 shadow-[0_4px_0_0_theme(colors.grape.200)] hover:bg-grape-100; }
+  .chip {
+    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold;
+  }
+  .input {
+    @apply w-full rounded-2xl border-2 border-grape-100 bg-white px-4 py-2.5 text-grape-900 placeholder-grape-300
+           focus:border-grape-400 focus:outline-none focus:ring-4 focus:ring-grape-100;
+  }
+  .section-title {
+    @apply font-display text-2xl font-extrabold text-grape-800 flex items-center gap-2;
+  }
+}
+
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
 }

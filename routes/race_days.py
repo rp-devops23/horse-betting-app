@@ -22,21 +22,16 @@ def get_race_day_data_by_date(race_date):
 
 @race_days_bp.route('/current', methods=['GET'])
 def get_current_race_day():
-    """Get the current/latest race day data."""
+    """Today's race day (Mauritius time), else the next upcoming one, else the latest."""
     from datetime import datetime
-    current_date = datetime.now().strftime('%Y-%m-%d')
-    day_data = data_service.get_race_day_data(current_date, current_user_id())
-    if day_data:
-        return jsonify({"data": day_data})
-    
-    # If no current day data, get the latest available
-    index_data = data_service.get_race_day_index()
-    if index_data.get("raceDays"):
-        latest_date = index_data["raceDays"][0]["date"]  # First is most recent
-        latest_data = data_service.get_race_day_data(latest_date, current_user_id())
-        return jsonify({"data": latest_data})
-    
-    return jsonify({"data": None})
+    from services.data_service import MAURITIUS_TZ
+    today = datetime.now(MAURITIUS_TZ).strftime('%Y-%m-%d')
+    dates = [d["date"] for d in data_service.get_race_day_index().get("raceDays", [])]  # newest first
+    if not dates:
+        return jsonify({"data": None})
+    upcoming = [d for d in dates if d >= today]
+    target = min(upcoming) if upcoming else dates[0]
+    return jsonify({"data": data_service.get_race_day_data(target, current_user_id())})
 
 @race_days_bp.route('/leaderboard', methods=['GET'])
 def get_leaderboard():
