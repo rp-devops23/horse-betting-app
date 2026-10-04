@@ -37,9 +37,9 @@ def get_current_race_day():
 
 @race_days_bp.route('/leaderboard', methods=['GET'])
 def get_leaderboard():
-    """Standings for a period: ?period=all (default) | YYYY | YYYY-MM."""
+    """Standings for a season: ?period=all (default) | YYYY."""
     period = request.args.get('period', 'all')
-    if period != 'all' and not re.fullmatch(r'\d{4}(-\d{2})?', period):
+    if period != 'all' and not re.fullmatch(r'\d{4}', period):
         return jsonify({"success": False, "error": "Invalid period"}), 400
     try:
         data = season_service.get_standings(period)
@@ -50,7 +50,7 @@ def get_leaderboard():
 
 @race_days_bp.route('/seasons', methods=['GET'])
 def get_seasons():
-    """Monthly seasons with their leader / champions."""
+    """Seasons (calendar years) with their leader / champions."""
     try:
         return jsonify({"success": True, **season_service.get_seasons()})
     except Exception as e:

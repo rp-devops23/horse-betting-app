@@ -46,6 +46,13 @@ const FormChart = ({ form }) => {
   );
 };
 
+const RARITY_STYLES = {
+  common: { card: 'bg-gradient-to-br from-mint-100 to-white border-mint-200', chip: 'bg-mint-100 text-mint-600' },
+  rare: { card: 'bg-gradient-to-br from-sky2-100 to-white border-sky2-200', chip: 'bg-sky2-100 text-sky2-500' },
+  epic: { card: 'bg-gradient-to-br from-grape-100 to-white border-grape-300', chip: 'bg-grape-100 text-grape-600' },
+  legendary: { card: 'bg-gradient-to-br from-sunny-200 to-white border-sunny-400 ring-2 ring-sunny-200', chip: 'bg-sunny-300 text-grape-900' },
+};
+
 const TopList = ({ title, items, emptyText }) => (
   <div className="card p-5">
     <h3 className="font-display text-lg font-extrabold text-grape-800 mb-3">{title}</h3>
@@ -89,8 +96,11 @@ const PlayerProfile = ({ userId, users, isMe, onBack, onEditAvatar, onOpenProfil
   if (!profile) return <div className="card"><EmptyState emoji="🤔" title="Profil introuvable" /></div>;
 
   const s = profile.summary;
-  const earned = profile.achievements.filter(a => a.earned);
-  const locked = profile.achievements.filter(a => !a.earned);
+  const rarityOrder = ['legendary', 'epic', 'rare', 'common'];
+  const byRarity = (a, b) => rarityOrder.indexOf(a.rarity) - rarityOrder.indexOf(b.rarity);
+  const earned = profile.achievements.filter(a => a.earned).sort(byRarity);
+  const locked = profile.achievements.filter(a => !a.earned).sort(byRarity);
+  const totalTrophies = earned.reduce((n, a) => n + a.count, 0);
 
   return (
     <div className="space-y-5">
@@ -111,11 +121,11 @@ const PlayerProfile = ({ userId, users, isMe, onBack, onEditAvatar, onOpenProfil
         <h2 className="mt-3 font-display text-3xl font-extrabold text-grape-900">{profile.user.name}</h2>
         <p className="text-grape-500 font-bold">
           {s.daysPlayed ? <>{s.rank}{s.rank === 1 ? 'er' : 'e'} au général</> : 'Pas encore classé'}
-          {s.monthRank && <> · {s.monthRank}{s.monthRank === 1 ? 'er' : 'e'} ce mois-ci ({s.monthScore} pts)</>}
+          {s.seasonRank && <> · {s.seasonRank}{s.seasonRank === 1 ? 'er' : 'e'} de la {s.seasonLabel.toLowerCase()} ({s.seasonScore} pts)</>}
         </p>
         {profile.titles.length > 0 && (
           <div className="mt-3 flex flex-wrap justify-center gap-2">
-            {profile.titles.map(t => <span key={t.id} className="chip bg-sunny-200 text-grape-900 text-sm">🏆 Champion {t.label}</span>)}
+            {profile.titles.map(t => <span key={t.id} className="chip bg-sunny-200 text-grape-900 text-sm">🏆 Champion · {t.label}</span>)}
           </div>
         )}
         {earned.length > 0 && <p className="mt-3 text-2xl tracking-wide" title={earned.map(a => a.name).join(', ')}>{earned.map(a => a.emoji).join(' ')}</p>}
@@ -142,27 +152,39 @@ const PlayerProfile = ({ userId, users, isMe, onBack, onEditAvatar, onOpenProfil
       {/* Trophy cabinet */}
       <div className="card p-5">
         <h3 className="font-display text-lg font-extrabold text-grape-800 mb-1">🏅 Armoire à trophées</h3>
-        <p className="text-sm text-grape-400 mb-4">{earned.length} sur {profile.achievements.length} débloqués</p>
+        <p className="text-sm text-grape-400 mb-4">
+          {earned.length} sur {profile.achievements.length} débloqués{totalTrophies > earned.length && <> · {totalTrophies} trophées au total</>}
+        </p>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          {[...earned, ...locked].map(a => (
-            <div key={a.id} className={`rounded-2xl border-2 p-3 ${a.earned ? 'bg-gradient-to-br from-sunny-100 to-white border-sunny-200' : 'bg-gray-50 border-gray-100'}`}>
-              <div className="flex items-center gap-2">
-                <span className={`text-3xl ${a.earned ? '' : 'grayscale opacity-40'}`}>{a.emoji}</span>
-                <div className="min-w-0">
-                  <p className={`font-display font-extrabold leading-tight ${a.earned ? 'text-grape-900' : 'text-gray-400'}`}>
-                    {a.name}{a.count > 1 && <span className="text-grape-500"> ×{a.count}</span>}
-                  </p>
-                  <p className="text-[11px] leading-tight text-grape-400">{a.description}</p>
+          {[...earned, ...locked].map(a => {
+            const r = RARITY_STYLES[a.rarity] || RARITY_STYLES.common;
+            const showBar = a.repeatProgress ? a.progress > 0 || !a.earned : !a.earned && a.target > 1;
+            return (
+              <div key={a.id} className={`relative rounded-2xl border-2 p-3 ${a.earned ? r.card : 'bg-gray-50 border-gray-100'}`}>
+                {a.count > 0 && (
+                  <span className="absolute -top-2 -right-2 min-w-[2rem] h-8 px-1.5 rounded-full bg-grape-500 text-white font-display font-extrabold flex items-center justify-center border-2 border-white shadow-chunky">
+                    ×{a.count}
+                  </span>
+                )}
+                <span className={`chip mb-1.5 ${a.earned ? r.chip : 'bg-gray-200 text-gray-400'}`}>{a.rarityLabel}</span>
+                <div className="flex items-center gap-2">
+                  <span className={`text-3xl ${a.earned ? '' : 'grayscale opacity-40'}`}>{a.emoji}</span>
+                  <div className="min-w-0">
+                    <p className={`font-display font-extrabold leading-tight break-words hyphens-auto ${a.earned ? 'text-grape-900' : 'text-gray-400'}`} lang="fr">{a.name}</p>
+                    <p className="text-[11px] leading-tight text-grape-400">{a.description}</p>
+                  </div>
                 </div>
+                {showBar && (
+                  <div className="mt-2">
+                    <ProgressBar value={a.progress} max={a.target} className={a.earned ? 'bg-grape-400' : 'bg-grape-300'} />
+                    <p className="text-[10px] font-bold text-gray-400 mt-0.5 text-right">
+                      {a.repeatProgress ? (a.earned ? 'prochain : ' : '') : 'record : '}{a.progress} / {a.target}
+                    </p>
+                  </div>
+                )}
               </div>
-              {!a.earned && a.target > 1 && (
-                <div className="mt-2">
-                  <ProgressBar value={a.progress} max={a.target} className="bg-grape-300" />
-                  <p className="text-[10px] font-bold text-gray-400 mt-0.5 text-right">{a.progress} / {a.target}</p>
-                </div>
-              )}
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 

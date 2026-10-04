@@ -9,7 +9,7 @@ const STEPS = [
   { emoji: '🐎', title: 'Un cheval par course', text: 'Touche un cheval pour parier. Tu peux changer d’avis jusqu’au départ.', colour: 'bg-sky2-100' },
   { emoji: '🤫', title: 'Paris secrets', text: 'Les choix des autres restent cachés jusqu’au départ de chaque course. Pas de copiage !', colour: 'bg-mint-100' },
   { emoji: '⭐', title: 'Ton banker', text: 'Une course par journée : si ton cheval gagne, ton total du jour est doublé !', colour: 'bg-sunny-100' },
-  { emoji: '🏆', title: 'Deviens champion', text: 'Chaque mois est une saison : le premier à la fin du mois remporte le trophée.', colour: 'bg-coral-100' },
+  { emoji: '🏆', title: 'Deviens champion', text: 'Les points s’additionnent sur toute la saison : le premier à la fin de l’année remporte le trophée. Et décroche des trophées spéciaux en route !', colour: 'bg-coral-100' },
 ];
 
 const PIN_HELP = [
@@ -30,7 +30,7 @@ const HomePage = ({ me, users, races, bets, bankers, selectedRaceDay, scoringCon
   useEffect(() => {
     apiFetch(`/race-days/seasons`)
       .then(r => (r.ok ? r.json() : null))
-      .then(data => data?.success && setSeason(data.months.find(m => m.isCurrent) || null))
+      .then(data => data?.success && setSeason(data.seasons.find(s => s.isCurrent) || null))
       .catch(() => {});
   }, []);
 
@@ -108,7 +108,7 @@ const HomePage = ({ me, users, races, bets, bankers, selectedRaceDay, scoringCon
                 </div>
               </div>
             ) : (
-              <p className="mt-2 font-bold text-grape-500">Personne n'a encore marqué ce mois-ci — le trophée est à prendre !</p>
+              <p className="mt-2 font-bold text-grape-500">Personne n'a encore marqué cette saison — le trophée est à prendre !</p>
             )}
           </button>
         )}

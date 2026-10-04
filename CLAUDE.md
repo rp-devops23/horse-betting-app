@@ -75,7 +75,7 @@ Scheduled GitHub Actions (`.github/workflows/`) call the scrape/odds/results end
 
 ## Seasons & trophies
 
-Each calendar month (Mauritius time) is a season; the top scorer when the month ends is its champion. Achievements (badges) are computed on the fly in `season_service.ACHIEVEMENTS` — nothing is stored.
+A season is a calendar year (Mauritius time); the top scorer when the year ends is its champion. `season_service.History` recomputes every day's scores from the bets with the current scoring config (it does not trust stored `UserScore` rows). Trophies (`season_service.TROPHIES`) are computed on the fly, nothing is stored; each has a rarity and counts how many times it was achieved. Ties share a rank (1, 1, 3) — the podium puts tied players on the same step.
 
 ## Scoring rules
 
