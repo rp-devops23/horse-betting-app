@@ -43,5 +43,8 @@ module.exports = {
       },
     },
   },
-  plugins: [],
+  plugins: [
+    // short: screens shorter than 700px (small phones, landscape)
+    require('tailwindcss/plugin')(({ addVariant }) => addVariant('short', '@media (max-height: 700px)')),
+  ],
 }

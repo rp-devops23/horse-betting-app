@@ -761,16 +761,19 @@ class DataService:
             else:
                 db.session.add(UserScore(id=str(uuid.uuid4()), user_id=user.id, race_date=race_date, score=total_score, wins=races_won))
 
-            scores.append({"userId": user.id, "name": user.name, "score": total_score, "races_won": races_won})
+            scores.append({"userId": user.id, "name": user.name, "score": total_score,
+                           "races_won": races_won, "bets": len(user_bets)})
 
         db.session.commit()
 
-        # Sort scores to determine rank
-        scores.sort(key=lambda x: x['score'], reverse=True)
+        # Rank by points, then winning horses (same rule as the season standings);
+        # only players equal on both share a rank
+        scores.sort(key=lambda x: (x['score'], x['races_won']), reverse=True)
+        for i, entry in enumerate(scores):
+            prev = scores[i - 1] if i else None
+            same = prev and (prev['score'], prev['races_won']) == (entry['score'], entry['races_won'])
+            entry['rank'] = prev['rank'] if same else i + 1
 
-        for i, score_entry in enumerate(scores):
-            score_entry['rank'] = i + 1
-        
         return scores
 
     # --- Backup / Restore ---

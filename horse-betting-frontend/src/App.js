@@ -480,7 +480,7 @@ const HorseBettingApp = () => {
   }[message.type] || 'bg-grape-700 text-white';
 
   return (
-    <div className="min-h-screen font-sans">
+    <div className="min-h-screen font-sans [overflow-x:clip]">
 
       {/* Cold-start overlay */}
       {slowLoad && (
@@ -494,18 +494,18 @@ const HorseBettingApp = () => {
 
       {/* Header */}
       <header className="sticky top-0 z-30 bg-cream/85 backdrop-blur border-b-2 border-grape-100">
-        <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between gap-3">
+        <div className="max-w-5xl mx-auto px-3 sm:px-4 min-h-[4rem] py-2 flex items-center justify-between gap-2">
           <button
-            className="flex items-center gap-2 select-none"
+            className="flex items-center gap-1.5 sm:gap-2 select-none min-w-0"
             onClick={() => setActiveTab('home')}
             onDoubleClick={handleAdminTabClick}
           >
-            <span className="text-3xl animate-float inline-block">🏇</span>
-            <span className="text-left leading-none">
-              <span className="block font-display text-2xl font-extrabold text-grape-700 tracking-tight">
+            <span className="text-2xl sm:text-3xl animate-float inline-block flex-shrink-0">🏇</span>
+            <span className="text-left leading-none min-w-0">
+              <span className="block font-display text-xl sm:text-2xl font-extrabold text-grape-700 tracking-tight whitespace-nowrap">
                 Lekours<span className="ml-1 align-top text-[10px] font-bold text-sunny-600 bg-sunny-100 rounded-full px-1.5 py-0.5">β</span>
               </span>
-              <span className="block text-[11px] font-bold text-grape-400 -mt-0.5">la famille Payen</span>
+              <span className="block text-[11px] font-bold text-grape-400 -mt-0.5 truncate">la famille Payen</span>
             </span>
           </button>
 
@@ -526,10 +526,10 @@ const HorseBettingApp = () => {
 
           {/* User chip */}
           {me ? (
-            <div ref={userMenuRef} className="relative">
-              <button onClick={() => setShowUserMenu(o => !o)} className="flex items-center gap-2 rounded-full bg-white border-2 border-grape-100 pl-1 pr-3 py-1 hover:border-grape-300 transition-colors">
+            <div ref={userMenuRef} className="relative min-w-0 flex-shrink">
+              <button onClick={() => setShowUserMenu(o => !o)} className="flex items-center gap-1.5 rounded-full bg-white border-2 border-grape-100 pl-1 pr-2.5 py-1 hover:border-grape-300 transition-colors max-w-full">
                 <Avatar user={me} users={users} size="sm" />
-                <span className="font-display font-bold text-grape-800 max-w-[7rem] truncate">{me.name}</span>
+                <span className="font-display font-bold text-grape-800 max-w-[5.5rem] sm:max-w-[7rem] truncate">{me.name}</span>
               </button>
               {showUserMenu && (
                 <div className="absolute right-0 mt-2 w-52 card p-2 animate-slide-up z-40">
@@ -546,7 +546,7 @@ const HorseBettingApp = () => {
               )}
             </div>
           ) : (
-            <button onClick={() => setShowPlayerPicker(true)} className="btn-primary py-2 text-sm">
+            <button onClick={() => setShowPlayerPicker(true)} className="btn-primary py-2 text-sm whitespace-nowrap flex-shrink-0">
               Je joue !
             </button>
           )}
@@ -633,12 +633,12 @@ const HorseBettingApp = () => {
             <button
               key={id}
               onClick={() => setActiveTab(id)}
-              className="flex-1 flex flex-col items-center justify-center pt-2 pb-2.5 gap-0.5"
+              className="flex-1 min-w-0 flex flex-col items-center justify-center pt-2 pb-2.5 gap-0.5"
             >
-              <span className={`flex items-center justify-center w-12 h-8 rounded-full transition-all ${activeTab === id ? 'bg-grape-500 text-white animate-pop' : 'text-grape-300'}`}>
+              <span className={`flex items-center justify-center w-full max-w-[3rem] h-8 rounded-full transition-all ${activeTab === id ? 'bg-grape-500 text-white animate-pop' : 'text-grape-300'}`}>
                 <Icon className="w-5 h-5" strokeWidth={activeTab === id ? 2.5 : 2} />
               </span>
-              <span className={`text-[11px] font-bold ${activeTab === id ? 'text-grape-700' : 'text-grape-300'}`}>{label}</span>
+              <span className={`text-[11px] font-bold max-w-full truncate px-0.5 ${activeTab === id ? 'text-grape-700' : 'text-grape-300'}`}>{label}</span>
             </button>
           ))}
         </div>
@@ -648,9 +648,9 @@ const HorseBettingApp = () => {
       <Modal open={showPlayerPicker} onClose={closePlayerPicker}>
         {pendingUser ? (
           <div className="text-center">
-            <Avatar user={pendingUser} users={users} size="lg" className="mx-auto mb-2" />
+            <Avatar user={pendingUser} users={users} size="lg" className="mx-auto mb-2 short:hidden" />
             <h3 className="font-display text-2xl font-extrabold text-grape-800">{pendingUser.name}</h3>
-            <p className="text-grape-500 mb-5">Ton code secret à 4 chiffres</p>
+            <p className="text-grape-500 mb-5 short:mb-3">Ton code secret à 4 chiffres</p>
             <PinPad value={pinInput} onChange={setPinInput} onSubmit={handlePinSubmit} shake={pinShake} busy={pinBusy} />
             {pinError && <p className="mt-4 text-sm font-bold text-coral-500" role="alert">{pinError}</p>}
             <p className="mt-4 text-xs text-grape-400">

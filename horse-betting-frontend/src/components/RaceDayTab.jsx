@@ -147,7 +147,10 @@ const RaceDayTab = ({
   const openRaces = sortedRaces.filter(r => !isRaceLocked(r, now));
   const myBetCount = selectedUserId ? sortedRaces.filter(r => betFor(selectedUserId, r.id)).length : 0;
   const nextRace = openRaces[0];
-  const topScores = raceDayScores.filter(s => s.score !== 0).slice(0, 6);
+  // Everyone who bet that day, ranked like the leaderboard (points, then winning horses)
+  const dayPlayers = raceDayScores.filter(s => (s.bets ?? (s.score !== 0 ? 1 : 0)) > 0);
+  const dayAbsent = raceDayScores.filter(s => !dayPlayers.includes(s));
+  const anyResult = races.some(r => r.winner != null);
 
   return (
     <div className="space-y-5">
@@ -194,8 +197,8 @@ const RaceDayTab = ({
             </div>
           ) : openRaces.length > 0 && (
             <div className="card p-5">
-              <div className="flex items-center justify-between gap-2 mb-2">
-                <p className="font-display text-lg font-extrabold text-grape-800">
+              <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 mb-2">
+                <p className="font-display text-lg font-extrabold text-grape-800 whitespace-nowrap">
                   Tes paris : {myBetCount}/{sortedRaces.length} {myBetCount === sortedRaces.length ? '🎉' : '🐎'}
                 </p>
                 {nextRace && raceStart(nextRace) && (
@@ -216,23 +219,31 @@ const RaceDayTab = ({
           )}
 
           {/* Day scores */}
-          {topScores.length > 0 && (
+          {anyResult && dayPlayers.length > 0 && (
             <div className="card p-4">
               <p className="font-display font-extrabold text-grape-800 mb-3 flex items-center gap-2"><Trophy className="w-5 h-5 text-sunny-500" /> Le score du jour</p>
-              <div className="flex gap-2 overflow-x-auto no-scrollbar">
-                {topScores.map((score, index) => {
+              <ul className="space-y-1.5">
+                {dayPlayers.map(score => {
                   const user = users.find(u => u.id === score.userId) || { id: score.userId, name: score.name };
+                  const medal = score.score > 0 ? MEDALS[score.rank - 1] : null;
+                  const isMe = score.userId === selectedUserId;
                   return (
-                    <button key={score.userId} onClick={() => onOpenProfile(score.userId)}
-                      className={`flex-shrink-0 flex items-center gap-2 rounded-full pl-1 pr-3 py-1 border-2 ${index === 0 ? 'bg-sunny-100 border-sunny-300' : 'bg-grape-50 border-grape-100'}`}>
-                      <Avatar user={user} users={users} size="sm" />
-                      <span className="font-bold text-grape-800">{score.name}</span>
-                      {MEDALS[index] && <span>{MEDALS[index]}</span>}
-                      <span className="font-display font-extrabold text-grape-600">{score.score} pt{Math.abs(score.score) > 1 ? 's' : ''}</span>
-                    </button>
+                    <li key={score.userId}>
+                      <button onClick={() => onOpenProfile(score.userId)}
+                        className={`w-full flex items-center gap-2 rounded-2xl px-2 py-1.5 border-2 text-left ${score.rank === 1 && score.score > 0 ? 'bg-sunny-100 border-sunny-300' : isMe ? 'bg-grape-50 border-grape-200' : 'bg-white border-grape-50'}`}>
+                        <span className="w-6 text-center font-display font-extrabold text-grape-300">{medal || score.rank}</span>
+                        <Avatar user={user} users={users} size="sm" />
+                        <span className="flex-1 min-w-0 font-bold text-grape-800 truncate">{score.name}{isMe && <span className="text-grape-400 font-semibold"> (toi)</span>}</span>
+                        <span className="text-xs font-bold text-grape-400 whitespace-nowrap">🐎 {score.races_won ?? 0}</span>
+                        <span className="w-14 text-right font-display font-extrabold text-grape-600 whitespace-nowrap">{score.score} pt{Math.abs(score.score) > 1 ? 's' : ''}</span>
+                      </button>
+                    </li>
                   );
                 })}
-              </div>
+              </ul>
+              {dayAbsent.length > 0 && (
+                <p className="mt-2 text-xs text-grape-400">Pas joué ce jour-là : {dayAbsent.map(s => s.name).join(', ')}</p>
+              )}
             </div>
           )}
 

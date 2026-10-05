@@ -51,7 +51,7 @@ const HomePage = ({ me, users, races, bets, bankers, selectedRaceDay, scoringCon
       <div className="card relative overflow-hidden p-6 sm:p-8 bg-gradient-to-br from-grape-500 via-grape-500 to-coral-400 border-grape-600 text-white">
         <div className="absolute -right-6 -bottom-8 text-[9rem] opacity-20 rotate-[-8deg] select-none pointer-events-none">🏇</div>
         <p className="font-display text-sm font-bold uppercase tracking-widest text-grape-100">Lekours · famille Payen</p>
-        <h1 className="mt-1 font-display text-4xl sm:text-5xl font-extrabold leading-tight">
+        <h1 className="mt-1 font-display text-3xl min-[400px]:text-4xl sm:text-5xl font-extrabold leading-tight">
           {me ? <>Salut {me.name}&nbsp;! 👋</> : <>Prêts pour la course&nbsp;? 🏁</>}
         </h1>
         <p className="mt-2 max-w-md text-grape-50 font-semibold">

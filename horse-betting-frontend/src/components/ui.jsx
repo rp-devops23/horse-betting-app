@@ -58,7 +58,7 @@ export const Modal = ({ open, onClose, children, className = '' }) => {
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-grape-900/50 backdrop-blur-sm p-0 sm:p-4" onClick={onClose}>
       <div
-        className={`relative w-full sm:max-w-sm bg-white rounded-t-[2rem] sm:rounded-[2rem] p-6 pb-8 shadow-pop animate-slide-up ${className}`}
+        className={`relative w-full sm:max-w-sm max-h-[calc(100vh-0.5rem)] max-h-[calc(100dvh-0.5rem)] overflow-y-auto overscroll-contain bg-white rounded-t-[2rem] sm:rounded-[2rem] p-6 pb-8 short:p-4 short:pb-5 shadow-pop animate-slide-up ${className}`}
         onClick={e => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
@@ -95,18 +95,18 @@ export const PinPad = ({ value, onChange, onSubmit, shake = false, busy = false 
   const press = (d) => !busy && value.length < 4 && onChange(value + d);
   return (
     <div>
-      <div className={`flex justify-center gap-3 mb-6 ${shake ? 'animate-shake' : ''}`}>
+      <div className={`flex justify-center gap-3 mb-6 short:mb-3 ${shake ? 'animate-shake' : ''}`}>
         {[0, 1, 2, 3].map(i => (
           <span key={i} className={`w-4 h-4 rounded-full transition-all ${i < value.length ? 'bg-grape-500 scale-110' : 'bg-grape-100'} ${busy ? 'animate-pulse' : ''}`} />
         ))}
       </div>
-      <div className="grid grid-cols-3 gap-3 max-w-[260px] mx-auto">
+      <div className="grid grid-cols-3 gap-3 short:gap-2 max-w-[260px] mx-auto">
         {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(d => (
-          <button key={d} type="button" onClick={() => press(d)} className="btn-ghost h-14 text-2xl">{d}</button>
+          <button key={d} type="button" onClick={() => press(d)} className="btn-ghost h-14 short:h-11 text-2xl">{d}</button>
         ))}
         <span />
-        <button type="button" onClick={() => press('0')} className="btn-ghost h-14 text-2xl">0</button>
-        <button type="button" onClick={() => onChange(value.slice(0, -1))} className="btn h-14 text-grape-400 hover:bg-grape-50" aria-label="Effacer">
+        <button type="button" onClick={() => press('0')} className="btn-ghost h-14 short:h-11 text-2xl">0</button>
+        <button type="button" onClick={() => onChange(value.slice(0, -1))} className="btn h-14 short:h-11 text-grape-400 hover:bg-grape-50" aria-label="Effacer">
           <Delete className="w-6 h-6" />
         </button>
       </div>
