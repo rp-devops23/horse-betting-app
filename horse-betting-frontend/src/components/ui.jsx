@@ -33,7 +33,11 @@ export const Spinner = ({ className = 'w-5 h-5' }) => (
 export const GallopLoader = ({ label = 'Chargement…' }) => (
   <div className="py-12 flex flex-col items-center gap-3 text-grape-400">
     <div className="relative w-48 h-10 overflow-hidden rounded-full bg-grape-50 border-2 border-grape-100">
-      <span className="absolute top-1 text-2xl animate-gallop" style={{ transform: 'scaleX(-1)' }}>🏇</span>
+      {/* Outer span runs left→right; inner span is mirrored so the horse faces where it goes
+          (the animation's transform would override a flip set on the same element) */}
+      <span className="absolute top-1 text-2xl animate-gallop">
+        <span className="inline-block -scale-x-100">🏇</span>
+      </span>
     </div>
     <p className="font-display font-bold">{label}</p>
   </div>
