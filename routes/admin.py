@@ -211,6 +211,22 @@ def admin_set_banker():
     return jsonify({"success": False, "error": "Failed to set banker"}), 500
 
 
+@admin_bp.route('/day-bets', methods=['GET'])
+@require_admin
+def get_day_bets():
+    """All bets and bankers of a race day, including ones still hidden from players (admin view)."""
+    from models import Bet, Race
+    race_date = request.args.get('race_date')
+    if not race_date:
+        return jsonify({"error": "race_date is required"}), 400
+    bets = Bet.query.join(Race).filter(Race.date == race_date).all()
+    return jsonify({
+        "bets": [{"userId": b.user_id, "raceId": b.race_id, "horse": b.horse_number,
+                  "is_banker": bool(b.is_banker)} for b in bets],
+        "bankers": {b.user_id: b.race_id for b in bets if b.is_banker},
+    })
+
+
 @admin_bp.route('/bet-logs', methods=['GET'])
 @require_admin
 def get_bet_logs():

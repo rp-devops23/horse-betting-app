@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Trophy, Edit3, X, Star, Check, Flag, Lock, Pencil, ChevronDown, Clock } from 'lucide-react';
+import { Trophy, Edit3, X, Star, Check, Flag, Lock, Pencil, ChevronDown, Clock, Eye, EyeOff } from 'lucide-react';
 import { apiFetch } from '../api';
 import { Avatar, EmptyState, GallopLoader, ProgressBar, MEDALS } from './ui.jsx';
 import { useNow, isRaceLocked, raceStart, formatCountdown, relativeDay, formatDay } from '../utils/time';
@@ -20,7 +20,7 @@ const saddleCloth = (n) => SADDLE_CLOTHS[n] || 'bg-grape-200 text-grape-800';
 const RaceDayTab = ({
   races, availableRaceDays, selectedRaceDay,
   fetchRaceDayData, refreshRaceDay, loading, isAdmin,
-  bets, bankers, users, selectedUserId, scoringConfig,
+  bets: playerBets, bankers: playerBankers, users, selectedUserId, scoringConfig,
   handleSetBet, handleSetBanker, onLogin, onOpenProfile, showMessage,
 }) => {
   const [editingRaceWinner, setEditingRaceWinner] = useState(null);
@@ -32,6 +32,31 @@ const RaceDayTab = ({
   const [pendingBet, setPendingBet] = useState(null);
   const now = useNow(15000);
   const dayStripRef = useRef(null);
+
+  // Admin-only: reveal every player's bets, including the ones still secret
+  const [showAllBets, setShowAllBets] = useState(() => {
+    try { return localStorage.getItem('lekours.adminShowBets') === '1'; } catch { return false; }
+  });
+  const [adminDay, setAdminDay] = useState(null);
+  const revealAll = isAdmin && showAllBets && !!adminDay;
+  const bets = revealAll ? adminDay.bets : playerBets;
+  const bankers = revealAll ? adminDay.bankers : playerBankers;
+
+  const toggleShowAllBets = () => {
+    const next = !showAllBets;
+    setShowAllBets(next);
+    try { localStorage.setItem('lekours.adminShowBets', next ? '1' : '0'); } catch { /* storage unavailable */ }
+  };
+
+  useEffect(() => {
+    if (!isAdmin || !showAllBets || !selectedRaceDay) { setAdminDay(null); return undefined; }
+    let cancelled = false;
+    apiFetch(`/admin/day-bets?race_date=${selectedRaceDay}`)
+      .then(res => (res.ok ? res.json() : Promise.reject(new Error('accès refusé'))))
+      .then(data => !cancelled && setAdminDay(data))
+      .catch(e => { if (!cancelled) { setAdminDay(null); showMessage(`Paris admin indisponibles : ${e.message}`, 'error'); } });
+    return () => { cancelled = true; };
+  }, [isAdmin, showAllBets, selectedRaceDay, races, playerBets, showMessage]);
 
   const sortedRaces = useMemo(() => [...races].sort((a, b) => a.raceNumber - b.raceNumber), [races]);
   const firstRace = sortedRaces[0];
@@ -155,6 +180,28 @@ const RaceDayTab = ({
   return (
     <div className="space-y-5">
 
+      {/* Admin: show / hide everyone's bets */}
+      {isAdmin && (
+        <div className={`card px-4 py-3 flex items-center gap-3 ${showAllBets ? 'bg-sunny-100 border-sunny-300' : ''}`}>
+          {showAllBets ? <Eye className="w-5 h-5 text-grape-700 flex-shrink-0" /> : <EyeOff className="w-5 h-5 text-grape-400 flex-shrink-0" />}
+          <div className="flex-1 min-w-0">
+            <p className="font-display font-extrabold text-grape-800 leading-tight">Voir tous les paris</p>
+            <p className="text-xs text-grape-500">
+              {showAllBets ? 'Mode admin : les paris secrets des joueurs sont visibles pour toi.' : 'Les paris restent secrets jusqu’au départ, comme pour les joueurs.'}
+            </p>
+          </div>
+          <button
+            role="switch"
+            aria-checked={showAllBets}
+            aria-label="Voir tous les paris"
+            onClick={toggleShowAllBets}
+            className={`relative flex-shrink-0 w-14 h-8 rounded-full transition-colors ${showAllBets ? 'bg-grape-500' : 'bg-grape-200'}`}
+          >
+            <span className={`absolute top-1 left-1 w-6 h-6 rounded-full bg-white shadow transition-transform ${showAllBets ? 'translate-x-6' : ''}`} />
+          </button>
+        </div>
+      )}
+
       {/* Day picker */}
       <div ref={dayStripRef} className="flex gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 pb-1">
         {days.map(day => {
@@ -254,7 +301,7 @@ const RaceDayTab = ({
             const locked = isRaceLocked(race, now);
             const finished = race.winner != null;
             const canBet = !!selectedUserId && (!locked || isAdmin);
-            const hiddenBets = !locked ? Math.max(0, (race.betCount || 0) - (myBet ? 1 : 0)) : 0;
+            const hiddenBets = !locked && !revealAll ? Math.max(0, (race.betCount || 0) - (myBet ? 1 : 0)) : 0;
             const start = raceStart(race);
             const wonMine = finished && myBet?.horse === race.winner;
             const winnerHorse = race.horses.find(h => h.number === race.winner);
@@ -327,6 +374,8 @@ const RaceDayTab = ({
                       <p className="text-mint-600">🎉 Gagné ! {winnerHorse?.name} te rapporte {winnerPoints ?? '?'} pt{winnerPoints > 1 ? 's' : ''}{isBanker ? ' — et ton banker double la journée ! ⭐' : ''}</p>
                     ) : finished ? (
                       <p className="text-grape-600">🏆 Gagnant : n°{race.winner} {winnerHorse?.name}{myBet ? ' — pas cette fois 😬' : ''}</p>
+                    ) : revealAll && !locked ? (
+                      <p className="text-grape-600">👁 {race.betCount || 0} pari{(race.betCount || 0) > 1 ? 's' : ''} — visible{(race.betCount || 0) > 1 ? 's' : ''} en mode admin</p>
                     ) : hiddenBets > 0 ? (
                       <p className="text-grape-500">🤫 {hiddenBets} pari{hiddenBets > 1 ? 's' : ''} secret{hiddenBets > 1 ? 's' : ''} — révélé{hiddenBets > 1 ? 's' : ''} au départ</p>
                     ) : !locked ? (
