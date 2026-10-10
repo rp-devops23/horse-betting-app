@@ -71,7 +71,7 @@ Scheduled GitHub Actions (`.github/workflows/`) call the scrape/odds/results end
 - Admin is either `User.is_admin` or a session that logged in with `ADMIN_PASSWORD`. All `/api/admin/*` routes (except login and `GET /settings`) and race mutation routes require it.
 - Login attempts are throttled in memory (5 failures → 5 minute lockout).
 - Bets lock server-side when a race starts (race time is Mauritius local, UTC+4) or has a result. Bankers lock for the whole day once the first race starts. Admins can override via `/api/admin/bet` and `/api/admin/banker`.
-- **Other players' bets are hidden until the race locks**; bankers are hidden until the first race of the day starts. `DataService.get_visible_bets` / `get_visible_bankers` / `get_race_day_data(viewer_id)` enforce this — never return raw bets from a public endpoint. Admins can opt in to see everything via the "Voir tous les paris" toggle on the race day tab (admin-only `GET /api/admin/day-bets?race_date=`; off by default, remembered in localStorage).
+- **Other players' bets are hidden until the race locks**; bankers are hidden until the first race of the day starts. `DataService.get_visible_bets` / `get_visible_bankers` / `get_race_day_data(viewer_id)` enforce this — never return raw bets from a public endpoint. An admin can lift the secret for everyone with the "Paris visibles par tous" switch on the race day tab: it stores `AppSetting('bets_revealed')` (`PUT /api/admin/bets-revealed`, read via public `GET /api/bets/revealed`), and the visibility functions then return every bet to every player. Off by default.
 
 ## Seasons & trophies
 

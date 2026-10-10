@@ -54,3 +54,9 @@ def get_all_bankers():
     """Banker bets {userId: raceId}; others' are hidden until the day's first race starts."""
     race_date = request.args.get('race_date')
     return jsonify(data_service.get_visible_bankers(race_date, current_user_id()))
+
+
+@betting_bp.route('/bets/revealed', methods=['GET'])
+def get_bets_revealed():
+    """Whether the admin made every bet visible to everyone."""
+    return jsonify({"revealed": data_service.get_bets_revealed()})

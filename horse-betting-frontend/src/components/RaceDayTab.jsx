@@ -33,30 +33,38 @@ const RaceDayTab = ({
   const now = useNow(15000);
   const dayStripRef = useRef(null);
 
-  // Admin-only: reveal every player's bets, including the ones still secret
-  const [showAllBets, setShowAllBets] = useState(() => {
-    try { return localStorage.getItem('lekours.adminShowBets') === '1'; } catch { return false; }
-  });
-  const [adminDay, setAdminDay] = useState(null);
-  const revealAll = isAdmin && showAllBets && !!adminDay;
-  const bets = revealAll ? adminDay.bets : playerBets;
-  const bankers = revealAll ? adminDay.bankers : playerBankers;
-
-  const toggleShowAllBets = () => {
-    const next = !showAllBets;
-    setShowAllBets(next);
-    try { localStorage.setItem('lekours.adminShowBets', next ? '1' : '0'); } catch { /* storage unavailable */ }
-  };
+  // Admin switch shared by everyone: when on, all bets are visible to all players
+  // (the server then stops hiding them, so `bets`/`bankers` already contain everything)
+  const bets = playerBets;
+  const bankers = playerBankers;
+  const [betsRevealed, setBetsRevealed] = useState(false);
+  const [savingReveal, setSavingReveal] = useState(false);
 
   useEffect(() => {
-    if (!isAdmin || !showAllBets || !selectedRaceDay) { setAdminDay(null); return undefined; }
     let cancelled = false;
-    apiFetch(`/admin/day-bets?race_date=${selectedRaceDay}`)
-      .then(res => (res.ok ? res.json() : Promise.reject(new Error('accès refusé'))))
-      .then(data => !cancelled && setAdminDay(data))
-      .catch(e => { if (!cancelled) { setAdminDay(null); showMessage(`Paris admin indisponibles : ${e.message}`, 'error'); } });
+    apiFetch(`/bets/revealed`)
+      .then(res => (res.ok ? res.json() : null))
+      .then(data => !cancelled && data && setBetsRevealed(!!data.revealed))
+      .catch(() => {});
     return () => { cancelled = true; };
-  }, [isAdmin, showAllBets, selectedRaceDay, races, playerBets, showMessage]);
+  }, [races]);
+
+  const toggleBetsRevealed = async () => {
+    const next = !betsRevealed;
+    setSavingReveal(true);
+    try {
+      const res = await apiFetch(`/admin/bets-revealed`, { method: 'PUT', body: JSON.stringify({ revealed: next }) });
+      const data = await res.json();
+      if (!res.ok) { showMessage(data.error || 'Réglage impossible', 'error'); return; }
+      setBetsRevealed(next);
+      await refreshRaceDay();
+      showMessage(next ? 'Les paris sont maintenant visibles par tous 👁' : 'Les paris redeviennent secrets 🤫', 'success');
+    } catch (e) {
+      showMessage(`Erreur : ${e.message}`, 'error');
+    } finally {
+      setSavingReveal(false);
+    }
+  };
 
   const sortedRaces = useMemo(() => [...races].sort((a, b) => a.raceNumber - b.raceNumber), [races]);
   const firstRace = sortedRaces[0];
@@ -180,25 +188,31 @@ const RaceDayTab = ({
   return (
     <div className="space-y-5">
 
-      {/* Admin: show / hide everyone's bets */}
-      {isAdmin && (
-        <div className={`card px-4 py-3 flex items-center gap-3 ${showAllBets ? 'bg-sunny-100 border-sunny-300' : ''}`}>
-          {showAllBets ? <Eye className="w-5 h-5 text-grape-700 flex-shrink-0" /> : <EyeOff className="w-5 h-5 text-grape-400 flex-shrink-0" />}
+      {/* Admin switch: show everyone's bets to everyone */}
+      {isAdmin ? (
+        <div className={`card px-4 py-3 flex items-center gap-3 ${betsRevealed ? 'bg-sunny-100 border-sunny-300' : ''}`}>
+          {betsRevealed ? <Eye className="w-5 h-5 text-grape-700 flex-shrink-0" /> : <EyeOff className="w-5 h-5 text-grape-400 flex-shrink-0" />}
           <div className="flex-1 min-w-0">
-            <p className="font-display font-extrabold text-grape-800 leading-tight">Voir tous les paris</p>
+            <p className="font-display font-extrabold text-grape-800 leading-tight">Paris visibles par tous</p>
             <p className="text-xs text-grape-500">
-              {showAllBets ? 'Mode admin : les paris secrets des joueurs sont visibles pour toi.' : 'Les paris restent secrets jusqu’au départ, comme pour les joueurs.'}
+              {betsRevealed ? 'Activé : tous les joueurs voient les paris de tout le monde.' : 'Désactivé : les paris restent secrets jusqu’au départ de chaque course.'}
             </p>
           </div>
           <button
             role="switch"
-            aria-checked={showAllBets}
-            aria-label="Voir tous les paris"
-            onClick={toggleShowAllBets}
-            className={`relative flex-shrink-0 w-14 h-8 rounded-full transition-colors ${showAllBets ? 'bg-grape-500' : 'bg-grape-200'}`}
+            aria-checked={betsRevealed}
+            aria-label="Paris visibles par tous"
+            onClick={toggleBetsRevealed}
+            disabled={savingReveal}
+            className={`relative flex-shrink-0 w-14 h-8 rounded-full transition-colors disabled:opacity-60 ${betsRevealed ? 'bg-grape-500' : 'bg-grape-200'}`}
           >
-            <span className={`absolute top-1 left-1 w-6 h-6 rounded-full bg-white shadow transition-transform ${showAllBets ? 'translate-x-6' : ''}`} />
+            <span className={`absolute top-1 left-1 w-6 h-6 rounded-full bg-white shadow transition-transform ${betsRevealed ? 'translate-x-6' : ''}`} />
           </button>
+        </div>
+      ) : betsRevealed && (
+        <div className="card px-4 py-3 flex items-center gap-3 bg-sunny-100 border-sunny-300">
+          <Eye className="w-5 h-5 text-grape-700 flex-shrink-0" />
+          <p className="text-sm font-bold text-grape-800">Les paris de tout le monde sont visibles — l’admin a levé le secret.</p>
         </div>
       )}
 
@@ -301,7 +315,7 @@ const RaceDayTab = ({
             const locked = isRaceLocked(race, now);
             const finished = race.winner != null;
             const canBet = !!selectedUserId && (!locked || isAdmin);
-            const hiddenBets = !locked && !revealAll ? Math.max(0, (race.betCount || 0) - (myBet ? 1 : 0)) : 0;
+            const hiddenBets = !locked && !betsRevealed ? Math.max(0, (race.betCount || 0) - (myBet ? 1 : 0)) : 0;
             const start = raceStart(race);
             const wonMine = finished && myBet?.horse === race.winner;
             const winnerHorse = race.horses.find(h => h.number === race.winner);
@@ -374,8 +388,8 @@ const RaceDayTab = ({
                       <p className="text-mint-600">🎉 Gagné ! {winnerHorse?.name} te rapporte {winnerPoints ?? '?'} pt{winnerPoints > 1 ? 's' : ''}{isBanker ? ' — et ton banker double la journée ! ⭐' : ''}</p>
                     ) : finished ? (
                       <p className="text-grape-600">🏆 Gagnant : n°{race.winner} {winnerHorse?.name}{myBet ? ' — pas cette fois 😬' : ''}</p>
-                    ) : revealAll && !locked ? (
-                      <p className="text-grape-600">👁 {race.betCount || 0} pari{(race.betCount || 0) > 1 ? 's' : ''} — visible{(race.betCount || 0) > 1 ? 's' : ''} en mode admin</p>
+                    ) : betsRevealed && !locked ? (
+                      <p className="text-grape-600">👁 {race.betCount || 0} pari{(race.betCount || 0) > 1 ? 's' : ''} — visible{(race.betCount || 0) > 1 ? 's' : ''} par tous</p>
                     ) : hiddenBets > 0 ? (
                       <p className="text-grape-500">🤫 {hiddenBets} pari{hiddenBets > 1 ? 's' : ''} secret{hiddenBets > 1 ? 's' : ''} — révélé{hiddenBets > 1 ? 's' : ''} au départ</p>
                     ) : !locked ? (

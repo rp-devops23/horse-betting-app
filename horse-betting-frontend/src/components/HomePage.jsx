@@ -7,7 +7,7 @@ import { useNow, isRaceLocked, raceStart, formatCountdown, relativeDay } from '.
 const STEPS = [
   { emoji: '🙋', title: 'Choisis ton profil', text: 'Touche « Je joue ! » en haut et entre ton code secret.', colour: 'bg-grape-100' },
   { emoji: '🐎', title: 'Un cheval par course', text: 'Touche un cheval pour parier. Tu peux changer d’avis jusqu’au départ.', colour: 'bg-sky2-100' },
-  { emoji: '🤫', title: 'Paris secrets', text: 'Les choix des autres restent cachés jusqu’au départ de chaque course. Pas de copiage !', colour: 'bg-mint-100' },
+  { emoji: '🤫', title: 'Paris secrets', text: 'Les choix des autres restent cachés jusqu’au départ de chaque course (sauf si l’admin décide de les montrer). Pas de copiage !', colour: 'bg-mint-100' },
   { emoji: '⭐', title: 'Ton banker', text: 'Une course par journée : si ton cheval gagne, ton total du jour est doublé !', colour: 'bg-sunny-100' },
   { emoji: '🏆', title: 'Deviens champion', text: 'Les points s’additionnent sur toute la saison : le premier à la fin de l’année remporte le trophée. Et décroche des trophées spéciaux en route !', colour: 'bg-coral-100' },
 ];

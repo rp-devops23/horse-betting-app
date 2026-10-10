@@ -182,8 +182,22 @@ class DataService:
         first = self.first_race_of_day(race_date)
         return first is not None and self.is_race_locked(first, now)
 
+    def get_bets_revealed(self) -> bool:
+        """Admin switch: when on, every player sees every bet (no secret bets)."""
+        setting = AppSetting.query.get('bets_revealed')
+        return bool(setting and setting.value == '1')
+
+    def set_bets_revealed(self, revealed: bool) -> None:
+        setting = AppSetting.query.get('bets_revealed')
+        if setting:
+            setting.value = '1' if revealed else '0'
+        else:
+            db.session.add(AppSetting(key='bets_revealed', value='1' if revealed else '0'))
+        db.session.commit()
+
     def get_visible_bets(self, viewer_id: str = None) -> List[Dict[str, Any]]:
         """All bets, except other players' bets on races that haven't locked yet."""
+        revealed = self.get_bets_revealed()
         now = datetime.now(timezone.utc)
         races = {r.id: r for r in Race.query.all()}
         locked = {rid: self.is_race_locked(r, now) for rid, r in races.items()}
@@ -194,11 +208,11 @@ class DataService:
             if not race:
                 continue
             is_mine = viewer_id is not None and bet.user_id == viewer_id
-            if not is_mine and not locked[bet.race_id]:
+            if not is_mine and not locked[bet.race_id] and not revealed:
                 continue
             if race.date not in banker_locked_dates:
                 banker_locked_dates[race.date] = self.is_banker_locked(race.date, now)
-            show_banker = is_mine or banker_locked_dates[race.date]
+            show_banker = is_mine or revealed or banker_locked_dates[race.date]
             result.append({
                 "userId": bet.user_id,
                 "raceId": bet.race_id,
@@ -209,6 +223,7 @@ class DataService:
 
     def get_visible_bankers(self, race_date: str = None, viewer_id: str = None) -> Dict[str, str]:
         """{user_id: race_id} of bankers; others' are hidden until the day's first race starts."""
+        revealed = self.get_bets_revealed()
         query = Bet.query.join(Race).filter(Bet.is_banker == True)  # noqa: E712
         if race_date:
             query = query.filter(Race.date == race_date)
@@ -219,7 +234,7 @@ class DataService:
             date = bet.race.date
             if date not in locked_dates:
                 locked_dates[date] = self.is_banker_locked(date, now)
-            if bet.user_id == viewer_id or locked_dates[date]:
+            if bet.user_id == viewer_id or revealed or locked_dates[date]:
                 result[bet.user_id] = bet.race_id
         return result
 
@@ -240,6 +255,7 @@ class DataService:
         if not races:
             return {}
 
+        revealed = self.get_bets_revealed()
         now = datetime.now(timezone.utc)
         banker_locked = self.is_race_locked(races[0], now)
         races_data = []
@@ -263,12 +279,12 @@ class DataService:
             race_bets = Bet.query.filter_by(race_id=race.id).all()
             bets_data = {
                 bet.user_id: bet.horse_number for bet in race_bets
-                if locked or bet.user_id == viewer_id
+                if locked or revealed or bet.user_id == viewer_id
             }
             bankers_data = [
                 {"userId": bet.user_id, "horseNumber": bet.horse_number}
                 for bet in race_bets
-                if bet.is_banker and (banker_locked or bet.user_id == viewer_id)
+                if bet.is_banker and (banker_locked or revealed or bet.user_id == viewer_id)
             ]
             start = self.race_start_time(race)
 
@@ -305,6 +321,7 @@ class DataService:
             "races": races_data,
             "userScores": user_scores_data,
             "bankerLocked": banker_locked,
+            "betsRevealed": revealed,
         }
 
     def save_current_race_day_data(self, day_data: Dict[str, Any]) -> bool:
