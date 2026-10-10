@@ -4,8 +4,9 @@ on:
   schedule:
     # Thu+Fri 18:00 MUT (UTC+4) = 14:00 UTC — cards typically published Thu/Fri
     - cron: "0 14 * * 4,5"
-    # Sat+Sun 08:00 MUT (UTC+4) = 04:00 UTC — morning fallback
-    - cron: "0 4 * * 6,0"
+    # Sat+Sun 07:30 MUT (UTC+4) = 03:30 UTC — morning fallback
+    # (kept off 04:00 UTC, when scrape-results runs its next-morning fallback)
+    - cron: "30 3 * * 6,0"
   workflow_dispatch: # allow manual trigger from GitHub UI
 
 jobs:

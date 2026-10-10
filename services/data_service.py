@@ -371,12 +371,18 @@ class DataService:
 
                 # Upsert horses — update odds/name if exists, create if not.
                 # Bets are never touched.
-                # Skip entirely for completed races: result pages on supertote show
-                # finishing positions as standalone numbers, which the parser mistakes
-                # for horse numbers. This corrupts names and zeros out odds for existing
-                # horses. Once a race has a winner, its horse data is final.
-                race_completed = existing_race and existing_race.winner_horse_number is not None
-                if not race_completed:
+                # Skip entirely once a race has started: its supertote page becomes a
+                # results page listing horses in finishing order, which the parser
+                # mistakes for horse numbers (the winner's name lands on horse #1).
+                # Waiting for the winner to be recorded is not enough — a re-import can
+                # run before the results job (e.g. both scheduled on Sunday morning).
+                today_mu = datetime.now(MAURITIUS_TZ).strftime('%Y-%m-%d')
+                race_frozen = existing_race and (
+                    self.is_race_locked(existing_race) or existing_race.date < today_mu
+                )
+                if race_frozen:
+                    logger.info("save_current_race_day_data: race %s has started — horses left unchanged", race_id)
+                else:
                     for horse_data in race_data.get('horses', []):
                         existing_horse = Horse.query.filter_by(
                             race_id=race_id, horse_number=horse_data['number']
